@@ -26,10 +26,10 @@ from loss import YoloLoss
 seed = 123
 torch.manual_seed(seed)
 
-# Hyperparameters etc. 
+# Hyperparameters etc.
 LEARNING_RATE = 2e-5
 DEVICE = "cuda" if torch.cuda.is_available else "cpu"
-BATCH_SIZE = 8 # in original paper but I don't have that much vram, grad accum?
+BATCH_SIZE = 1 # in original paper but I don't have that much vram, grad accum?
 WEIGHT_DECAY = 0
 EPOCHS = 100
 NUM_WORKERS = 2
