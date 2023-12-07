@@ -75,3 +75,16 @@ class BoxIterator:
         else:
             raise StopIteration
 
+
+def obj_print (out_tensor):
+    haight = out_tensor.shape[0]
+    width = out_tensor.shape[1]
+
+    box_num = (out_tensor.shape[2] - CLASSES_NUM - BOXES_NUM)/BOX_PROPERTIES_LEN
+    if int(box_num) != box_num: raise Exception()
+    else: box_num = int(box_num)
+    for h in range(haight):
+        for w in range(width):
+            for probability, box in BoxIterator(out_tensor[h][w]):
+                if probability: 
+                    print(f"{h}:{w} {probability} {box}")

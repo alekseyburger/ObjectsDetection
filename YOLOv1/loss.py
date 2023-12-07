@@ -83,30 +83,31 @@ class YoloLoss(nn.Module):
             resposaible_box = moutput_box(predictions,b)
             resposaible_box = (resposaible_box_idx == b).unsqueeze(-1) * resposaible_box
             resposaible_box = cell_is_representative * resposaible_box
+            box_b_center = (resposaible_box_idx == b).unsqueeze(-1) * target_box_center
+            box_b_h_w_sqr = (resposaible_box_idx == b).unsqueeze(-1) * target_box_h_w_sqr
             
             resposaible_box_center = box_center(resposaible_box)
-            loss_center += self.mse(torch.flatten(target_box_center, end_dim=-2),
+            loss_center += self.mse(torch.flatten(box_b_center, end_dim=-2),
                                     torch.flatten(resposaible_box_center, end_dim=-2))
 
             resposaible_box_h_w = box_h_w(resposaible_box)
             resposaible_box_h_w_sqr = torch.sign(resposaible_box_h_w) * torch.sqrt(torch.abs(resposaible_box_h_w) + 1e-6 )
 
-            loss_h_w +=  self.mse(torch.flatten(target_box_h_w_sqr, end_dim=-2),
+            loss_h_w +=  self.mse(torch.flatten(box_b_h_w_sqr, end_dim=-2),
                         torch.flatten(resposaible_box_h_w_sqr, end_dim=-2)) #
             
             # ==================== #
             #   FOR OBJECT LOSS    #
             # ==================== #
-            resposaible_box_confidence = moutput_box_confidence(predictions,b)
+            box_confidence = moutput_box_confidence(predictions,b)
+            box_confidence_with_obj =  (resposaible_box_idx == b).unsqueeze(-1) * box_confidence
+            box_confidence_no_obj =  (resposaible_box_idx != b).unsqueeze(-1) * box_confidence
+            box_b_confidence =  (resposaible_box_idx == b).unsqueeze(-1) * target_box_confidence
 
-            loss_obj_confidention += self.mse(torch.flatten(target_box_confidence, end_dim=-2),
-                            torch.flatten(cell_is_representative * resposaible_box_confidence, end_dim=-2))
-            
-            # ======================= #
-            #   FOR NO OBJECT LOSS    #
-            # ======================= #            
-            
-            loss_no_object += torch.sum(torch.square(((cell_is_representative -1)*resposaible_box_confidence)))
+            loss_obj_confidention += self.mse(torch.flatten(box_b_confidence, end_dim=-2),
+                            torch.flatten(box_confidence_with_obj, end_dim=-2))
+                      
+            loss_no_object += torch.sum(torch.square(box_confidence_no_obj))
 
         # ================== #
         #   FOR CLASS LOSS   #

@@ -17,6 +17,7 @@ python -m unittest test_loss.py
 
 PRED0=CLASSES_NUM
 BOX0=PRED0+BOXES_NUM
+BOX1=BOX0+BOX_PROPERTIES_LEN
 
 def nearly_equal (expected, result):
     threshold = 10e-3
@@ -61,10 +62,10 @@ class TestLoss(unittest.TestCase):
         self.clean()
 
         ouput_as_list = self.ouput_as_list_zero.copy()
-        ouput_as_list[PRED0:PRED0+2] = [1.,1.]
+        ouput_as_list[PRED0:PRED0+2] = [1., 0.]
         self.prediction[0,0,0] = torch.tensor(ouput_as_list)
 
-        ouput_as_list[PRED0:PRED0+2] = [1.,0.]
+        ouput_as_list[PRED0:PRED0+2] = [1., 0.]
         ouput_as_list[0] = 1. # class 0
         self.target[0,0,0] = torch.tensor(ouput_as_list)
 
@@ -87,9 +88,9 @@ class TestLoss(unittest.TestCase):
 
         loss = self.loss_func(self.prediction, self.target)
 
-        expected_loss = 2.0
+        expected_loss = 1.0
         self.assertTrue(nearly_equal(expected_loss, loss),
-                        msg = f"Center Loss box 0 = {loss} expect {expected_loss}")
+                        msg = f"Confidence Loss box 0 = {loss} expect {expected_loss}")
 
         # false positive confidence
         self.clean()
@@ -105,24 +106,26 @@ class TestLoss(unittest.TestCase):
 
         expected_loss = 2.0 * NOOBJ_LOSS_WEIGHT
         self.assertTrue(nearly_equal(expected_loss, loss),
-                        msg = f"Center Loss box 0 = {loss} expect {expected_loss}")
+                        msg = f"Confidence Loss box 0 = {loss} expect {expected_loss}")
         
         # false positive confidence
         self.clean()
 
         ouput_as_list = self.ouput_as_list_zero.copy()
 
-        ouput_as_list[PRED0] = 1.
+        ouput_as_list[PRED0:PRED0+2] = [1., 0.]
+        ouput_as_list[BOX0 : BOX0 + 2*BOX_PROPERTIES_LEN] = [0.1 , 0.1, 0.4, 0.4, 0., 0, 0., 0.]
         self.target[0,0,0] = torch.tensor(ouput_as_list)
 
-        ouput_as_list[PRED0+1] = 1.
+        ouput_as_list[PRED0:PRED0+2] = [0., 1.]
+        ouput_as_list[BOX0 : BOX0 + 2*BOX_PROPERTIES_LEN] = [0., 0., 0., 0., 0.1 , 0.1, 0.4, 0.4]
         self.prediction[0,0,0] = torch.tensor(ouput_as_list)
-
+        #pdb.set_trace()
         loss = self.loss_func(self.prediction, self.target)
 
         expected_loss = 0.
         self.assertTrue(nearly_equal(expected_loss, loss),
-                        msg = f"Center Loss box 0 = {loss} expect {expected_loss}")        
+                        msg = f"Confidence Loss box 0 = {loss} expect {expected_loss}")        
      
 
     def test_center (self):
@@ -133,11 +136,15 @@ class TestLoss(unittest.TestCase):
         self.assertTrue(nearly_equal(0.,loss),
                         msg = f"Zero:Zero Loss = {loss}")
 
-        # self.clean()
-        # false negative box 0 and 1
+        # false negative boxes
+        # prediction has no boxes
+        # target has 1 boxe
+        
+        self.clean()
         ouput_as_list = self.ouput_as_list_zero.copy()
 
-        ouput_as_list[PRED0:PRED0+2] = [1.,1.]
+        ouput_as_list[PRED0:PRED0+2] = [0.,0.]
+
         self.prediction[0,0,0] = torch.tensor(ouput_as_list)
 
         ouput_as_list[PRED0:PRED0+2] = [1.,0.]
@@ -146,7 +153,7 @@ class TestLoss(unittest.TestCase):
         self.target[0,0,0] = torch.tensor(ouput_as_list)
 
         loss = self.loss_func(self.prediction, self.target)
-        expected_loss = COORD_LOSS_WEIGHT * (0.5**2 + 0.3**2) * 2
+        expected_loss = COORD_LOSS_WEIGHT * (0.5**2 + 0.3**2) +  1.**2
 
         self.assertTrue(nearly_equal(expected_loss, loss),
                         msg = f"Center Loss box 0 = {loss} expect {expected_loss}")
@@ -173,17 +180,18 @@ class TestLoss(unittest.TestCase):
 
         ouput_as_list = self.ouput_as_list_zero.copy()
 
-        ouput_as_list[CLASSES_NUM : CLASSES_NUM+1] = [1.,]
-        ouput_as_list[CLASSES_NUM + BOXES_NUM : CLASSES_NUM + BOXES_NUM + BOX_PROPERTIES_LEN] = [0.1 , 0.1, 0.4, 0.4]
+        ouput_as_list[PRED0 : PRED0+1] = [1.,]
+        ouput_as_list[BOX0 : BOX0 + BOX_PROPERTIES_LEN] = [0.1 , 0.1, 0.4, 0.4]
 
         y_cell, x_cell = CELLS_PER_DIM//2, CELLS_PER_DIM//2
         self.target[0, y_cell, x_cell] = torch.tensor(ouput_as_list)
 
-        ouput_as_list[PRED0 : PRED0+2] = [1.,1.]  # privent no_object_loss
+        #ouput_as_list[PRED0 : PRED0+2] = [1.,0.]  # privent no_object_loss
         self.prediction[0, y_cell, x_cell] = torch.tensor(ouput_as_list)
-
+        # pdb.set_trace()
         loss = self.loss_func(self.prediction, self.target)
-        expected_loss = COORD_LOSS_WEIGHT * (0.1**2 + 0.1**2 + 0.4 + 0.4 )
+
+        expected_loss = 0.
         self.assertTrue( nearly_equal(expected_loss, loss),
                         msg = f"target and pred are equal center Loss {loss} {expected_loss}")
 
@@ -192,22 +200,22 @@ class TestLoss(unittest.TestCase):
 
         ouput_as_list = self.ouput_as_list_zero.copy()
 
-        ouput_as_list[CLASSES_NUM : CLASSES_NUM+1] = [1.,]
-        ouput_as_list[CLASSES_NUM + BOXES_NUM : CLASSES_NUM + BOXES_NUM + BOX_PROPERTIES_LEN] = [0.1 , 0.1, 0.4, 0.4]
+        ouput_as_list[PRED0 : PRED0+1] = [1.,]
+        ouput_as_list[BOX0 : BOX0 + BOX_PROPERTIES_LEN] = [0.1 , 0.1, 0.4, 0.4]
 
         y_cell, x_cell = CELLS_PER_DIM//2, CELLS_PER_DIM//2
         self.target[0, y_cell, x_cell] = torch.tensor(ouput_as_list)
 
         ouput_as_list = self.ouput_as_list_zero.copy()
 
-        ouput_as_list[PRED0 : PRED0+2] = [1.,1.]  # privent no_object_loss        
-        ouput_as_list[CLASSES_NUM + BOXES_NUM + BOX_PROPERTIES_LEN: CLASSES_NUM + BOXES_NUM + 2*BOX_PROPERTIES_LEN] = [0.1 , 0.1, 0.4, 0.4]
+        ouput_as_list[PRED0 : PRED0+2] = [0.,1.]     
+        ouput_as_list[BOX1: BOX1 + BOX_PROPERTIES_LEN] = [0.1 , 0.1, 0.4, 0.4]
 
         self.prediction[0, y_cell, x_cell] = torch.tensor(ouput_as_list)
 
         loss = self.loss_func(self.prediction, self.target)
         # box #1 brings the loss
-        expected_loss = COORD_LOSS_WEIGHT * (0.1**2 + 0.1**2 + 0.4 + 0.4 )
+        expected_loss = 0.
         self.assertTrue( nearly_equal(expected_loss, loss),
                         msg = f"target and pred are equal center Loss {loss} {expected_loss}")
 
