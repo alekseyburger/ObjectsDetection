@@ -31,6 +31,8 @@ import pathlib
 parser = argparse.ArgumentParser(prog='train',
             description='model trainer')
 parser.add_argument('-e', '--epoch', default=100, help='epohs number')
+parser.add_argument('-b', '--batch', default=32, help='batch size')
+parser.add_argument('--no_cuda', default=False, help='disable GPU')
 parser.add_argument('-i', '--input_data', type=pathlib.Path, required = True)
 parser.add_argument('-t', '--test_data', type=pathlib.Path, required = True)
 
@@ -47,21 +49,19 @@ if not os.path.exists(test_data_path):
     print("Test data in not found at {test_data_path}")
     sys.exit(1)
 
-
-
 seed = 123
 torch.manual_seed(seed)
 
+DEVICE = "cuda" if torch.cuda.is_available and not args.no_cuda else "cpu"
+BATCH_SIZE = int(args.batch)
 # Hyperparameters etc.
 LEARNING_RATE = 2e-5
-DEVICE = "cuda" if torch.cuda.is_available else "cpu"
-BATCH_SIZE = 1 # in original paper but I don't have that much vram, grad accum?
 WEIGHT_DECAY = 0
 EPOCHS = int(args.epoch)
 NUM_WORKERS = 2
 PIN_MEMORY = True
 LOAD_MODEL = False
-LOAD_MODEL_FILE = "overfit.pth.tar"
+
 IMG_DIR = "data/images"
 LABEL_DIR = "data/labels"
 
@@ -155,6 +155,7 @@ def main():
     }
 
     mean_avg_prec = best_mean_avg = 0.0
+    reason = 'final'
 
     try:
         for epoch in range(EPOCHS):
@@ -181,9 +182,10 @@ def main():
 
     except KeyboardInterrupt:
         print('Interrupted')
+        reason = "Interrupted"
         pass
 
-    save_checkpoint(checkpoint, filename=model_file_name(f'final-mAP{mean_avg_prec:.2f}'))
+    save_checkpoint(checkpoint, filename=model_file_name(f'{reason}-mAP{mean_avg_prec:.2f}'))
 
 if __name__ == "__main__":
     main()
