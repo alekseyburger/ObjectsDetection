@@ -27,6 +27,11 @@ import os, sys
 from datetime import datetime
 import argparse
 import pathlib
+import logging, logging.config
+
+
+logging.config.fileConfig("loggin.conf")
+logger = logging.getLogger("trainLog")
 
 parser = argparse.ArgumentParser(prog='train',
             description='model trainer')
@@ -109,10 +114,12 @@ def train_fn(train_loader, model, optimizer, loss_fn):
         # update progress bar
         loop.set_postfix(loss=loss.item())
 
-    print(f"Mean loss was {sum(mean_loss)/len(mean_loss)}")
+    logger.info(f"Mean loss was {sum(mean_loss)/len(mean_loss)}")
 
 
 def main():
+
+    logger.info(f"Start train: {test_data_path} test: {test_data_path}")
 
     model = Yolov1(split_size=7, num_boxes=2, num_classes=20).to(DEVICE)
     optimizer = optim.Adam(
@@ -122,6 +129,7 @@ def main():
 
     if model_path:
         load_checkpoint(torch.load(model_path), model, optimizer)
+        logger.info(f"Load model {model_path}")
 
     train_dataset = VOCDataset(
         test_data_path,
@@ -160,7 +168,7 @@ def main():
         "optimizer": optimizer.state_dict(),
     }
 
-    mean_avg_prec = best_mean_avg = 0.0
+    best_mean_avg = 0.8
     reason = 'final'
 
     try:
@@ -177,21 +185,25 @@ def main():
                 target_boxes,
                 iou_threshold=0.5)
 
-            print(f"EPOCH {epoch}/{EPOCHS} \nTrain mAP: {mean_avg_prec}")
+            logger.info(f"EPOCH {epoch}/{EPOCHS}")
+            logger.info(f"Train mAP: {mean_avg_prec}")
 
-            if (best_mean_avg == 0 and mean_avg_prec > 0.9) or \
-                (best_mean_avg != 0 and mean_avg_prec > best_mean_avg):
+            if mean_avg_prec > best_mean_avg:
                 best_mean_avg = mean_avg_prec
-                save_checkpoint(checkpoint, filename=model_file_name(f'best-mAP{mean_avg_prec:.2f}'))
+                cp_filename = model_file_name(f'best-mAP{mean_avg_prec:.2f}')
+                save_checkpoint(checkpoint,filename = cp_filename)
+                logger.info(f"Save model {cp_filename}")
 
             train_fn(train_loader, model, optimizer, loss_fn)
 
     except KeyboardInterrupt:
-        print('Interrupted')
+        logger.info('Interrupted')
         reason = "Interrupted"
         pass
 
-    save_checkpoint(checkpoint, filename=model_file_name(f'{reason}-mAP{mean_avg_prec:.2f}'))
+    cp_filename = model_file_name(f'{reason}-mAP{mean_avg_prec:.2f}')
+    save_checkpoint(checkpoint, filename = cp_filename)
+    logger.info(f"Save model {cp_filename}")
 
 if __name__ == "__main__":
     main()

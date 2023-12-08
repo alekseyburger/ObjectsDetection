@@ -114,11 +114,11 @@ def main():
     cont = int(args.count)
     for images, exp_label in test_loader:
         images = images.to(DEVICE)
-        #pred_boxes = cellboxes_to_boxes(model(images))
-        exp_boxes = cellboxes_to_boxes(exp_label.reshape(exp_label.shape[0],-1))
+        pred_boxes = cellboxes_to_boxes(model(images))
+        #exp_boxes = cellboxes_to_boxes(exp_label.reshape(exp_label.shape[0],-1))
         for idx in range(images.shape[0]):
-            #best_boxes = non_max_suppression(pred_boxes[idx], iou_threshold=0.5, threshold=0.4)
-            best_boxes = non_max_suppression(exp_boxes[idx], iou_threshold=0.5, threshold=0.4)
+            best_boxes = non_max_suppression(pred_boxes[idx], iou_threshold=0.5, threshold=0.4)
+            #best_boxes = non_max_suppression(exp_boxes[idx], iou_threshold=0.5, threshold=0.4)
             for i in range(len(best_boxes)): print(best_boxes[i])
 
             plot_image(images[idx].permute(1,2,0).to("cpu"), best_boxes, cls)
