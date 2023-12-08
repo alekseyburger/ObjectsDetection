@@ -22,8 +22,32 @@ from utils import (
     load_checkpoint,
 )
 from loss import YoloLoss
+
+import os, sys
 from datetime import datetime
-import os
+import argparse
+import pathlib
+
+parser = argparse.ArgumentParser(prog='train',
+            description='model trainer')
+parser.add_argument('-e', '--epoch', default=100, help='epohs number')
+parser.add_argument('-i', '--input_data', type=pathlib.Path, required = True)
+parser.add_argument('-t', '--test_data', type=pathlib.Path, required = True)
+
+parser.add_argument('--imodel', type=pathlib.Path)
+args = parser.parse_args()
+
+train_data_path = args.input_data
+if not os.path.exists(train_data_path):
+    print("Train data in not found at {train_data_path}")
+    sys.exit(1)
+
+test_data_path = args.input_data
+if not os.path.exists(test_data_path):
+    print("Test data in not found at {test_data_path}")
+    sys.exit(1)
+
+
 
 seed = 123
 torch.manual_seed(seed)
@@ -33,7 +57,7 @@ LEARNING_RATE = 2e-5
 DEVICE = "cuda" if torch.cuda.is_available else "cpu"
 BATCH_SIZE = 1 # in original paper but I don't have that much vram, grad accum?
 WEIGHT_DECAY = 0
-EPOCHS = 100
+EPOCHS = int(args.epoch)
 NUM_WORKERS = 2
 PIN_MEMORY = True
 LOAD_MODEL = False
@@ -84,6 +108,7 @@ def train_fn(train_loader, model, optimizer, loss_fn):
 
 
 def main():
+
     model = Yolov1(split_size=7, num_boxes=2, num_classes=20).to(DEVICE)
     optimizer = optim.Adam(
         model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY
@@ -93,15 +118,18 @@ def main():
     #load_checkpoint(torch.load(LOAD_MODEL_FILE), model, optimizer)
 
     train_dataset = VOCDataset(
-        "data/8examples.csv",
+        test_data_path,
         transform=transform,
         img_dir=IMG_DIR,
         label_dir=LABEL_DIR,
     )
 
-    # test_dataset = VOCDataset(
-    #     "data/test.csv", transform=transform, img_dir=IMG_DIR, label_dir=LABEL_DIR,
-    # )
+    test_dataset = VOCDataset(
+        test_data_path,
+        transform=transform,
+        img_dir=IMG_DIR,
+        label_dir=LABEL_DIR,
+    )
 
     train_loader = DataLoader(
         dataset=train_dataset,
@@ -112,54 +140,48 @@ def main():
         drop_last=True,
     )
 
-    # test_loader = DataLoader(
-    #     dataset=test_dataset,
-    #     batch_size=BATCH_SIZE,
-    #     num_workers=NUM_WORKERS,
-    #     pin_memory=PIN_MEMORY,
-    #     shuffle=True,
-    #     drop_last=True,
-    # )
-
-    for epoch in range(EPOCHS):
-        # for x, y in train_loader:
-        #    x = x.to(DEVICE)
-        #    for idx in range(8):
-        #        bboxes = cellboxes_to_boxes(model(x))
-        #        bboxes = non_max_suppression(bboxes[idx], iou_threshold=0.5, threshold=0.4, box_format="midpoint")
-        #        plot_image(x[idx].permute(1,2,0).to("cpu"), bboxes)
-
-        #    import sys
-        #    sys.exit()
-
-        pred_boxes, target_boxes = get_bboxes(
-            train_loader,
-            model,
-            iou_threshold=0.5,
-            threshold=0.4)
-
-        mean_avg_prec = mean_average_precision(
-            pred_boxes,
-            target_boxes,
-            iou_threshold=0.5)
-
-        print(f"EPOCH {epoch}/{EPOCHS} Train mAP: {mean_avg_prec}")
-
-        # if mean_avg_prec > 0.9:
-        #    checkpoint = {
-        #        "state_dict": model.state_dict(),
-        #        "optimizer": optimizer.state_dict(),
-        #    }
-        #    save_checkpoint(checkpoint, filename=LOAD_MODEL_FILE)
-        #    import time
-        #    time.sleep(10)
-
-        train_fn(train_loader, model, optimizer, loss_fn)
+    test_loader = DataLoader(
+        dataset=test_dataset,
+        batch_size=BATCH_SIZE,
+        num_workers=NUM_WORKERS,
+        pin_memory=PIN_MEMORY,
+        shuffle=True,
+        drop_last=True,
+    )
 
     checkpoint = {
         "state_dict": model.state_dict(),
         "optimizer": optimizer.state_dict(),
     }
+
+    mean_avg_prec = best_mean_avg = 0.0
+
+    try:
+        for epoch in range(EPOCHS):
+
+            pred_boxes, target_boxes = get_bboxes(
+                test_loader,
+                model,
+                iou_threshold=0.5,
+                threshold=0.4)
+
+            mean_avg_prec = mean_average_precision(
+                pred_boxes,
+                target_boxes,
+                iou_threshold=0.5)
+
+            print(f"EPOCH {epoch}/{EPOCHS} \nTrain mAP: {mean_avg_prec}")
+
+            if (best_mean_avg == 0 and mean_avg_prec > 0.9) or \
+                (best_mean_avg != 0 and mean_avg_prec > best_mean_avg):
+                best_mean_avg = mean_avg_prec
+                save_checkpoint(checkpoint, filename=model_file_name(f'best-mAP{mean_avg_prec:.2f}'))
+
+            train_fn(train_loader, model, optimizer, loss_fn)
+
+    except KeyboardInterrupt:
+        print('Interrupted')
+        pass
 
     save_checkpoint(checkpoint, filename=model_file_name(f'final-mAP{mean_avg_prec:.2f}'))
 
