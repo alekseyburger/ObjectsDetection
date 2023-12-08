@@ -22,6 +22,8 @@ from utils import (
     load_checkpoint,
 )
 from loss import YoloLoss
+from datetime import datetime
+import os
 
 seed = 123
 torch.manual_seed(seed)
@@ -40,6 +42,14 @@ IMG_DIR = "data/images"
 LABEL_DIR = "data/labels"
 
 print(f"Tourch device is {DEVICE}")
+
+def model_file_name(pref : str = ""):
+    dir_name = "model"
+    if not os.path.exists(dir_name):
+        os.makedirs(dir_name)
+    current_time = datetime.now()
+    sfx = f'-{current_time.date()}'+current_time.strftime(".%H.%M.%S")
+    return dir_name + "/model-" + pref + sfx + ".pth.tar"
 
 class Compose(object):
     def __init__(self, transforms):
@@ -133,7 +143,7 @@ def main():
             target_boxes,
             iou_threshold=0.5)
 
-        print(f"Train mAP: {mean_avg_prec}")
+        print(f"EPOCH {epoch}/{EPOCHS} Train mAP: {mean_avg_prec}")
 
         # if mean_avg_prec > 0.9:
         #    checkpoint = {
@@ -150,7 +160,8 @@ def main():
         "state_dict": model.state_dict(),
         "optimizer": optimizer.state_dict(),
     }
-    save_checkpoint(checkpoint, filename=LOAD_MODEL_FILE)
+
+    save_checkpoint(checkpoint, filename=model_file_name(f'final-mAP{mean_avg_prec:.2f}'))
 
 if __name__ == "__main__":
     main()
