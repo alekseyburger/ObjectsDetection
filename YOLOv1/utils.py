@@ -26,15 +26,15 @@ def intersection_over_union(prediction_box, target_box, hw_image_proportional = 
     # box center is releative offset in the cell, but H&W is image releative
 
     multiplier =  CELLS_PER_DIM / 2. if hw_image_proportional else 1.
-    box1_y1 = prediction_box[..., 0:1] - prediction_box[..., 2:3]*multiplier
-    box1_x1 = prediction_box[..., 1:2] - prediction_box[..., 3:4]*multiplier
-    box1_y2 = prediction_box[..., 0:1] + prediction_box[..., 2:3]*multiplier
-    box1_x2 = prediction_box[..., 1:2] + prediction_box[..., 3:4]*multiplier
+    box1_x1 = prediction_box[..., 0:1] - prediction_box[..., 2:3]*multiplier
+    box1_y1 = prediction_box[..., 1:2] - prediction_box[..., 3:4]*multiplier
+    box1_x2 = prediction_box[..., 0:1] + prediction_box[..., 2:3]*multiplier
+    box1_y2 = prediction_box[..., 1:2] + prediction_box[..., 3:4]*multiplier
 
-    box2_y1 = target_box[..., 0:1] - target_box[..., 2:3]*multiplier
-    box2_x1 = target_box[..., 1:2] - target_box[..., 3:4]*multiplier
-    box2_y2 = target_box[..., 0:1] + target_box[..., 2:3]*multiplier
-    box2_x2 = target_box[..., 1:2] + target_box[..., 3:4]*multiplier
+    box2_x1 = target_box[..., 0:1] - target_box[..., 2:3]*multiplier
+    box2_y1 = target_box[..., 1:2] - target_box[..., 3:4]*multiplier
+    box2_x2 = target_box[..., 0:1] + target_box[..., 2:3]*multiplier
+    box2_y2 = target_box[..., 1:2] + target_box[..., 3:4]*multiplier
 
     x1 = torch.max(box1_x1, box2_x1)
     y1 = torch.max(box1_y1, box2_y1)
@@ -302,6 +302,7 @@ def convert_cellboxes(predictions, S=CELLS_PER_DIM):
     predictions = predictions.to("cpu")
     batch_size = predictions.shape[0]
     predictions = predictions.reshape(batch_size, S, S, OUTPUT_LEN)
+
     bboxes1 = moutput_box(predictions,0)
     bboxes2 = moutput_box(predictions,1)
 
@@ -313,24 +314,23 @@ def convert_cellboxes(predictions, S=CELLS_PER_DIM):
         dim=0)
     # scores = moutput_confidences(predictions)
     best_box = scores.argmax(0).unsqueeze(-1)
-    best_boxes = bboxes1 * (1 - best_box) + best_box * bboxes2
+    best_boxes = (1 - best_box) * bboxes1  + best_box * bboxes2
+
     cell_indices = torch.arange(S,).repeat(batch_size, S, 1).unsqueeze(-1)
-    y = 1 / S * (best_boxes[..., :1] + cell_indices.permute(0, 2, 1, 3))
-    x = 1 / S * (best_boxes[..., 1:2] + cell_indices)
+    x = 1 / S * (best_boxes[..., :1] + cell_indices)
+    y = 1 / S * (best_boxes[..., 1:2] + cell_indices.permute(0, 2, 1, 3))
     #w_y = 1 / S * best_boxes[..., 2:4]
     # w_h = best_boxes[..., 2:4]
-    w_h = torch.cat((best_boxes[..., 3:4], best_boxes[..., 2:3]), dim=-1)
+    w_h = best_boxes[..., 2:4]
     converted_bboxes = torch.cat((x, y, w_h), dim=-1)
+
     predicted_class = predictions[..., :20].argmax(-1).unsqueeze(-1)
     best_confidence = torch.max(box1_confidence, box2_confidence).unsqueeze(-1)
-    converted_preds = torch.cat(
-        (predicted_class, best_confidence, converted_bboxes), dim=-1
-    )
 
-    return converted_preds
+    return torch.cat((predicted_class, best_confidence, converted_bboxes), dim=-1)
 
 
-def cellboxes_to_boxes(out, S=CELLS_PER_DIM):
+def cellboxes_to_boxes(out, S=7):
     converted_pred = convert_cellboxes(out).reshape(out.shape[0], S * S, -1)
     converted_pred[..., 0] = converted_pred[..., 0].long()
     all_bboxes = []
@@ -343,6 +343,7 @@ def cellboxes_to_boxes(out, S=CELLS_PER_DIM):
         all_bboxes.append(bboxes)
 
     return all_bboxes
+
 
 def save_checkpoint(state, filename="my_checkpoint.pth.tar"):
     print("=> Saving checkpoint")

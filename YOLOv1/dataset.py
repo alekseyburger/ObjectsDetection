@@ -15,11 +15,16 @@ from model_output import BoxIterator
 import pdb
 
 class VOCDataset(torch.utils.data.Dataset):
-    def __init__(self, csv_file, img_dir, label_dir,
-                 S=CELLS_PER_DIM,
-                 B=BOXES_NUM,
-                 C=CLASSES_NUM,
-                 transform=None):
+    def __init__(self,
+                csv_file,
+                img_dir,
+                label_dir,
+                is_training_mode = False,
+                transform=None,
+                S=CELLS_PER_DIM,
+                B=BOXES_NUM,
+                C=CLASSES_NUM,):
+
         self.annotations = pd.read_csv(csv_file)
         self.img_dir = img_dir
         self.label_dir = label_dir
@@ -27,7 +32,7 @@ class VOCDataset(torch.utils.data.Dataset):
         self.S = S
         self.B = B
         self.C = C
-        self.training_mode = True
+        self.training_mode = is_training_mode
  
         # self.debug_count = 0
 
@@ -55,15 +60,17 @@ class VOCDataset(torch.utils.data.Dataset):
             # image = self.transform(image)
             image, boxes = self.transform(image, boxes)
 
-        # Convert To Cells
+        # Convert To Cells: cell * cell * ( classes , boxes_confidence, boxes(in-cell-x, in-cell-y, in-image-width, in-image-hieght) )
         label_matrix = torch.zeros((self.S, self.S, self.C + self.B + (BOX_PROPERTIES_LEN * self.B)))
         for box in boxes:
             class_label, x, y, width, height = box.tolist()
             class_label = int(class_label)
 
             # i,j represents the cell row and cell column
-            i_y, i_x = int(self.S * y), int(self.S * x)
-            y_cell, x_cell  = self.S * y - i_y, self.S * x - i_x
+            y_in_img, x_in_img = self.S * y, self.S * x
+            i_y, i_x = int(y_in_img), int(x_in_img)
+            # y_in_cell, x_in_cell - box center in-cell offsets
+            y_in_cell, x_in_cell  = y_in_img - i_y, x_in_img - i_x
 
             from model_output import soutput_box_probability, soutput_box, soutput_set_box
             # If no object already found for specific cell i,j
@@ -71,10 +78,11 @@ class VOCDataset(torch.utils.data.Dataset):
             # per cell!
             for bidx in range(self.B):
                 if soutput_box_probability(label_matrix[i_y, i_x], bidx) == 0.:
+                    # 'Free' box - fill it
                     soutput_box_probability(label_matrix[i_y, i_x], bidx)[0] = 1.
                     soutput_set_box(label_matrix[i_y, i_x],
                                     bidx,
-                                    torch.tensor([y_cell, x_cell, height, width ]))
+                                    torch.tensor([ x_in_cell, y_in_cell, width, height ]))
                     break
                 # only one target per cell in training mode
                 if self.training_mode: break
