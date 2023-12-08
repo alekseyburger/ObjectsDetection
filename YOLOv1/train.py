@@ -35,8 +35,8 @@ parser.add_argument('-b', '--batch', default=32, help='batch size')
 parser.add_argument('--no_cuda', default=False, help='disable GPU')
 parser.add_argument('-i', '--input_data', type=pathlib.Path, required = True)
 parser.add_argument('-t', '--test_data', type=pathlib.Path, required = True)
+parser.add_argument('-m', '--model', type=pathlib.Path)
 
-parser.add_argument('--imodel', type=pathlib.Path)
 args = parser.parse_args()
 
 train_data_path = args.input_data
@@ -47,6 +47,11 @@ if not os.path.exists(train_data_path):
 test_data_path = args.input_data
 if not os.path.exists(test_data_path):
     print("Test data in not found at {test_data_path}")
+    sys.exit(1)
+
+model_path = args.model
+if model_path and not os.path.exists(model_path):
+    print("Model in not found at {model_path}")
     sys.exit(1)
 
 seed = 123
@@ -115,7 +120,8 @@ def main():
     )
     loss_fn = YoloLoss()
 
-    #load_checkpoint(torch.load(LOAD_MODEL_FILE), model, optimizer)
+    if model_path:
+        load_checkpoint(torch.load(model_path), model, optimizer)
 
     train_dataset = VOCDataset(
         test_data_path,

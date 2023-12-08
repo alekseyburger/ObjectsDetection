@@ -37,7 +37,6 @@ parser.add_argument('--no-cuda',
                     default=False,
                     help='disable GPU')
 parser.add_argument('-t', '--test_data', type=pathlib.Path, required = True)
-
 parser.add_argument('-m', '--model', type=pathlib.Path, required = True)
 args = parser.parse_args()
 
