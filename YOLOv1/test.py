@@ -21,6 +21,7 @@ from utils import (
     save_checkpoint,
     load_checkpoint,
 )
+import pdb
 
 import os, sys
 from datetime import datetime
@@ -109,15 +110,18 @@ def main():
             'chair','cow','diningtable','dog',
             'horse','motorbike','person','pottedplant',
             'sheep','sofa','train','tvmonitor']
+    
     cont = int(args.count)
-    for x, y in test_loader:
-        x = x.to(DEVICE)
-        for idx in range(x.shape[0]):
-            bboxes = cellboxes_to_boxes(model(x))
-            bboxes = non_max_suppression(bboxes[idx], iou_threshold=0.5, threshold=0.4)
-            for i in range(len(bboxes)):
-                print(bboxes[i])
-            plot_image(x[idx].permute(1,2,0).to("cpu"), bboxes, cls)
+    for images, exp_label in test_loader:
+        images = images.to(DEVICE)
+        #pred_boxes = cellboxes_to_boxes(model(images))
+        exp_boxes = cellboxes_to_boxes(exp_label.reshape(exp_label.shape[0],-1))
+        for idx in range(images.shape[0]):
+            #best_boxes = non_max_suppression(pred_boxes[idx], iou_threshold=0.5, threshold=0.4)
+            best_boxes = non_max_suppression(exp_boxes[idx], iou_threshold=0.5, threshold=0.4)
+            for i in range(len(best_boxes)): print(best_boxes[i])
+
+            plot_image(images[idx].permute(1,2,0).to("cpu"), best_boxes, cls)
 
             cont -= 1
             if cont <= 0:
