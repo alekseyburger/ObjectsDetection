@@ -105,7 +105,12 @@ def main():
         drop_last=True,
     )
 
-    cont = args.count
+    cls = ['aeroplane','bicycle','bird','boat',
+            'bottle','bus','car','cat',
+            'chair','cow','diningtable','dog',
+            'horse','motorbike','person','pottedplant',
+            'sheep','sofa','train','tvmonitor']
+    cont = int(args.count)
     for x, y in test_loader:
         x = x.to(DEVICE)
         for idx in range(x.shape[0]):
@@ -113,7 +118,7 @@ def main():
             bboxes = non_max_suppression(bboxes[idx], iou_threshold=0.5, threshold=0.4)
             for i in range(len(bboxes)):
                 print(bboxes[i])
-            plot_image(x[idx].permute(1,2,0).to("cpu"), bboxes)
+            plot_image(x[idx].permute(1,2,0).to("cpu"), bboxes, cls)
 
             cont -= 1
             if cont <= 0:

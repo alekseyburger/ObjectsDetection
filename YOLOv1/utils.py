@@ -195,7 +195,7 @@ def mean_average_precision(
     return sum(average_precisions) / len(average_precisions)
 
 
-def plot_image(image, boxes):
+def plot_image(image, boxes, cls):
     """Plots predicted bounding boxes on the image"""
     im = np.array(image)
     height, width, _ = im.shape
@@ -210,6 +210,8 @@ def plot_image(image, boxes):
 
     # Create a Rectangle potch
     for box in boxes:
+        class_id = int(box[0])
+        confidence = box[1]
         # skip lass and confidence
         box = box[2:]
 
@@ -226,7 +228,13 @@ def plot_image(image, boxes):
         )
         # Add the patch to the Axes
         ax.add_patch(rect)
-
+        caption = f'{cls[class_id]}({confidence:.2f})'
+        ax.annotate(caption,
+                    (upper_left_x * width, upper_left_y * height),
+                    color='red',
+                    weight='bold',
+                    fontsize=10,
+                    ha='left', va='top')
     plt.show()
 
 def get_bboxes( loader,
