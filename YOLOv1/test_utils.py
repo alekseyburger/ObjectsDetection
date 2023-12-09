@@ -36,6 +36,11 @@ python -m unittest test_loss.py
 PRED0=CLASSES_NUM
 BOX0=PRED0+BOXES_NUM
 
+def nearly_equal (expected, result):
+    threshold = 10e-3
+    if expected > 10e-3:
+        threshold = expected / 100.
+    return abs(expected - result) < threshold
 
 class TestUtils(unittest.TestCase):
 
@@ -67,6 +72,26 @@ class TestUtils(unittest.TestCase):
 
         self.ouput_as_list_zero = [0 for i in range(CLASSES_NUM + BOXES_NUM + BOXES_AREA_LEN)]
 
+    def test_mean_average_precision(self):
+
+        # in-batch-idx, class, confidence x,y,w,h
+        true_bbox = [0, 1, 1., 0.2, 0.2, 0.1, 0.1]
+        pred_bbox = true_bbox.copy()
+
+        self.assertTrue(nearly_equal(1.0, mean_average_precision([pred_bbox,], [true_bbox,]).item()))
+
+        # in-batch-idx, class, confidence x,y,w,h
+        true_bbox = [0, 1, 1., 0.2, 0.2, 0.1, 0.1]
+        pred_bbox = [0, 2, 1., 0.2, 0.2, 0.1, 0.1]
+
+        self.assertTrue(nearly_equal(0.0, mean_average_precision([pred_bbox,], [true_bbox,])))
+
+         # in-batch-idx, class, confidence x,y,w,h
+        true_bbox = [0, 1, 1., 0.2, 0.2, 0.1, 0.1]
+        pred_bbox = [0, 1, 1., 0.4, 0.4, 0.1, 0.1]
+
+        self.assertTrue(nearly_equal(0.0, mean_average_precision([pred_bbox,], [true_bbox,])))
+
     def test_convert_cellboxes(self):
 
         self.clean()
@@ -81,7 +106,7 @@ class TestUtils(unittest.TestCase):
 
         ret = convert_cellboxes(self.prediction, CELLS_PER_DIM)
 
-    def test_ellboxes_to_boxes(self):
+    def test_cellboxes_to_boxes(self):
 
         self.clean()
 

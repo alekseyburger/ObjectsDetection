@@ -78,11 +78,7 @@ def non_max_suppression(bboxes, iou_threshold, threshold):
             box
             for box in bboxes
             if box[0] != chosen_box[0]
-            or intersection_over_union(
-                torch.tensor(chosen_box[2:]),
-                torch.tensor(box[2:])
-            )
-            < iou_threshold
+            or intersection_over_union(torch.tensor(chosen_box[2:]), torch.tensor(box[2:])) < iou_threshold
         ]
 
         bboxes_after_nms.append(chosen_box)
@@ -112,7 +108,7 @@ def mean_average_precision(
 
     # used for numerical stability later on
     epsilon = 1e-6
-
+    
     for c in range(num_classes):
         detections = []
         ground_truths = []
@@ -243,6 +239,9 @@ def get_bboxes( loader,
                 threshold,
                 pred_format="cells",
                 device="cuda",):
+    """
+    Return: List of [in-batch-idx, class, confidence x,y,w,h]
+    """
     
     all_pred_boxes = []
     all_true_boxes = []

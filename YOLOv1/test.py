@@ -13,12 +13,8 @@ from model import Yolov1
 from dataset import VOCDataset
 from utils import (
     non_max_suppression,
-    mean_average_precision,
-    intersection_over_union,
     cellboxes_to_boxes,
-    get_bboxes,
     plot_image,
-    save_checkpoint,
     load_checkpoint,
 )
 import pdb
@@ -117,7 +113,7 @@ def main():
         pred_boxes = cellboxes_to_boxes(model(images))
         #exp_boxes = cellboxes_to_boxes(exp_label.reshape(exp_label.shape[0],-1))
         for idx in range(images.shape[0]):
-            best_boxes = non_max_suppression(pred_boxes[idx], iou_threshold=0.5, threshold=0.4)
+            best_boxes = non_max_suppression(pred_boxes[idx], iou_threshold=0.8, threshold=0.2)
             #best_boxes = non_max_suppression(exp_boxes[idx], iou_threshold=0.5, threshold=0.4)
             for i in range(len(best_boxes)): print(best_boxes[i])
 
