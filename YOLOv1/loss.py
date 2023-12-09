@@ -94,10 +94,10 @@ class YoloLoss(nn.Module):
             resposaible_box_h_w_sqr = torch.sign(resposaible_box_h_w) * torch.sqrt(torch.abs(resposaible_box_h_w) + 1e-6 )
 
             loss_h_w +=  self.mse(torch.flatten(box_b_h_w_sqr, end_dim=-2),
-                        torch.flatten(resposaible_box_h_w_sqr, end_dim=-2)) #
+                        torch.flatten(resposaible_box_h_w_sqr, end_dim=-2))
             
             # ==================== #
-            #   FOR OBJECT LOSS    #
+            #   FOR CONFIDENCE LOSS    #
             # ==================== #
             box_confidence = moutput_box_confidence(predictions,b)
             box_confidence_with_obj =  (resposaible_box_idx == b).unsqueeze(-1) * box_confidence

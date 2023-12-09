@@ -77,18 +77,39 @@ class TestLoss(unittest.TestCase):
     
     def test_confidention (self):
 
+        # true positive confidence
+        self.clean()
+
+        ouput_as_list = self.ouput_as_list_zero.copy()
+
+        ouput_as_list[BOX0 : BOX0 + 2*BOX_PROPERTIES_LEN] = [0.1 , 0.1, 0.4, 0.4, 0.5, 0.5, 0.1, 0.1]
+        ouput_as_list[PRED0:PRED0+2] = [1.,0]
+
+        self.target[0,0,0] = torch.tensor(ouput_as_list)
+
+        ouput_as_list[PRED0:PRED0+2] = [.5, .7]
+        self.prediction[0,0,0] = torch.tensor(ouput_as_list)
+
+        loss = self.loss_func(self.prediction, self.target)
+
+        expected_loss = (1. - 0.5)**2 + (.7**2)*NOOBJ_LOSS_WEIGHT
+        self.assertTrue(nearly_equal(expected_loss, loss),
+                        msg = f"Confidence Loss box 0 = {loss} expect {expected_loss}")
+
+
         # false neative confidence
         self.clean()
 
         ouput_as_list = self.ouput_as_list_zero.copy()
 
+        ouput_as_list[BOX0 : BOX0 + 2*BOX_PROPERTIES_LEN] = [0.1 , 0.1, 0.4, 0.4, 0., 0, 0., 0.]
         ouput_as_list[PRED0] = 1.
 
         self.target[0,0,0] = torch.tensor(ouput_as_list)
 
         loss = self.loss_func(self.prediction, self.target)
 
-        expected_loss = 1.0
+        expected_loss = COORD_LOSS_WEIGHT* (0.1**2 +  0.1**2 + 0.4 + 0.4) + 1.
         self.assertTrue(nearly_equal(expected_loss, loss),
                         msg = f"Confidence Loss box 0 = {loss} expect {expected_loss}")
 
@@ -97,18 +118,18 @@ class TestLoss(unittest.TestCase):
 
         ouput_as_list = self.ouput_as_list_zero.copy()
 
-        ouput_as_list[PRED0] = 1.
-        ouput_as_list[PRED0+1] = 1.
+        ouput_as_list[BOX0 : BOX0 + 2*BOX_PROPERTIES_LEN] = [0.1 , 0.1, 0.4, 0.4, 0., 0, 0., 0.]
+        ouput_as_list[PRED0:PRED0+2] = [1.,1.]
 
         self.prediction[0,0,0] = torch.tensor(ouput_as_list)
 
         loss = self.loss_func(self.prediction, self.target)
 
-        expected_loss = 2.0 * NOOBJ_LOSS_WEIGHT
+        expected_loss = (1.**2 + 1**2) * NOOBJ_LOSS_WEIGHT
         self.assertTrue(nearly_equal(expected_loss, loss),
                         msg = f"Confidence Loss box 0 = {loss} expect {expected_loss}")
         
-        # false positive confidence
+        # true positive confidence
         self.clean()
 
         ouput_as_list = self.ouput_as_list_zero.copy()
@@ -117,13 +138,13 @@ class TestLoss(unittest.TestCase):
         ouput_as_list[BOX0 : BOX0 + 2*BOX_PROPERTIES_LEN] = [0.1 , 0.1, 0.4, 0.4, 0., 0, 0., 0.]
         self.target[0,0,0] = torch.tensor(ouput_as_list)
 
-        ouput_as_list[PRED0:PRED0+2] = [0., 1.]
+        ouput_as_list[PRED0:PRED0+2] = [0., 0.1]
         ouput_as_list[BOX0 : BOX0 + 2*BOX_PROPERTIES_LEN] = [0., 0., 0., 0., 0.1 , 0.1, 0.4, 0.4]
         self.prediction[0,0,0] = torch.tensor(ouput_as_list)
         #pdb.set_trace()
         loss = self.loss_func(self.prediction, self.target)
 
-        expected_loss = 0.
+        expected_loss = (1. - 0.1)**2
         self.assertTrue(nearly_equal(expected_loss, loss),
                         msg = f"Confidence Loss box 0 = {loss} expect {expected_loss}")        
      
