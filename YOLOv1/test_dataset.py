@@ -39,10 +39,9 @@ class Compose(object):
 
         return img, bboxes
 
-def nearly_equal (expected, result):
-    threshold = 10e-3
-    if expected > 10e-3:
-        threshold = expected / 100.
+def nearly_equal (expected, result, threshold = 10e-3):
+    # if expected > (threshold * 100.):
+    #     threshold = expected / 100.
     return abs(expected - result) < threshold
 
 import pdb
@@ -95,19 +94,17 @@ class TestDataset(unittest.TestCase):
         iterator = train_loader._get_iterator()
         try:
 
-            images_list, boxes_list = iterator.__next__()
+            _, boxes_list = iterator.__next__()
             # for target in boxes_list:
             soutput = boxes_list[0,y_cell,x_cell]
 
             self.assertEqual(soutput[12].item(),1)
             self.assertEqual(soutput_box_probability(soutput,0).item(), 1)
-            box_pattern = torch.tensor([y, x, 0.42133333333333334, 0.402])
-            self.assertTrue(nearly_equal(0., torch.sum(soutput_box(soutput,0) - box_pattern)))
-
-            # pdb.set_trace()
+            box_pattern = torch.tensor([ x, y, 0.402, 0.42133333333333334])
+            self.assertTrue(nearly_equal(0., torch.sum(torch.abs(soutput_box(soutput,0) - box_pattern))))
 
         except StopIteration:
-            print("EOI")
+            self.assertFalse(True, "Unexpected end of saples")
 
 if __name__ == '__main__':
     unittest.main()
