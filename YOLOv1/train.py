@@ -28,6 +28,15 @@ import logging, logging.config
 logging.config.fileConfig("loggin.conf")
 logger = logging.getLogger("trainLog")
 
+for handler in logger.handlers:
+    if hasattr(handler, "baseFilename"):
+        logfile_name = getattr(handler, 'baseFilename')
+        logfile_name = os.path.abspath(logfile_name)
+        logfile_dir = os.path.dirname(logfile_name)
+        if not os.path.exists(logfile_dir):
+            print(f"Create {logfile_dir}")
+            os.makedirs(logfile_dir)
+
 parser = argparse.ArgumentParser(prog='train',
             description='model trainer')
 parser.add_argument('-e', '--epoch', default=100, help='epohs number')

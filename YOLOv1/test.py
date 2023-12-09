@@ -23,18 +23,40 @@ import os, sys
 from datetime import datetime
 import argparse
 import pathlib
+import logging, logging.config
+
+
+logging.config.fileConfig("loggin.conf")
+logger = logging.getLogger("testLog")
+
+for handler in logger.handlers:
+    if hasattr(handler, "baseFilename"):
+        logfile_name = getattr(handler, 'baseFilename')
+        logfile_name = os.path.abspath(logfile_name)
+        logfile_dir = os.path.dirname(logfile_name)
+        if not os.path.exists(logfile_dir):
+            print(f"Create {logfile_dir}")
+            os.makedirs(logfile_dir)
 
 parser = argparse.ArgumentParser(prog='test',
             description='model tester')
-parser.add_argument('-c', '--count', default=1, help='number of examples')
+parser.add_argument('-t', '--test_data', type=pathlib.Path, required = True)
+parser.add_argument('-m', '--model', type=pathlib.Path, required = True)
 parser.add_argument('-b', '--batch', default=32, help='batch size')
 parser.add_argument('--no-cuda',
                     action='store_const',
                     const=True,
                     default=False,
                     help='disable GPU')
-parser.add_argument('-t', '--test_data', type=pathlib.Path, required = True)
-parser.add_argument('-m', '--model', type=pathlib.Path, required = True)
+parser.add_argument('-c', '--count', default=1, help='number of examples')
+parser.add_argument('--iou', default=0.5, type = float, help='iou threshold (0.5)')
+parser.add_argument('--nms', default=0.4, type = float, help='non max suppression threshold (0.4)')
+parser.add_argument('--ground-true',
+                    action='store_const',
+                    const=True,
+                    default=False,
+                    help='show round true boxes')
+
 args = parser.parse_args()
 
 model_path = args.model
@@ -46,6 +68,10 @@ test_data_path = args.test_data
 if not os.path.exists(test_data_path):
     print("Test data in not found at {test_data_path}")
     sys.exit(1)
+
+iou_threshold = float(args.iou)
+nms_hreshold = float(args.nms)
+is_ground_true = args.ground_true
 
 seed = 123
 torch.manual_seed(seed)
@@ -110,11 +136,14 @@ def main():
     cont = int(args.count)
     for images, exp_label in test_loader:
         images = images.to(DEVICE)
-        pred_boxes = cellboxes_to_boxes(model(images))
-        #exp_boxes = cellboxes_to_boxes(exp_label.reshape(exp_label.shape[0],-1))
+        boxes = cellboxes_to_boxes(model(images))
+        if is_ground_true:
+            boxes = cellboxes_to_boxes(exp_label.reshape(exp_label.shape[0],-1))
+
         for idx in range(images.shape[0]):
-            best_boxes = non_max_suppression(pred_boxes[idx], iou_threshold=0.8, threshold=0.2)
-            #best_boxes = non_max_suppression(exp_boxes[idx], iou_threshold=0.5, threshold=0.4)
+            best_boxes = non_max_suppression(boxes[idx],
+                                             iou_threshold = iou_threshold,
+                                             threshold = nms_hreshold)
             for i in range(len(best_boxes)): print(best_boxes[i])
 
             plot_image(images[idx].permute(1,2,0).to("cpu"), best_boxes, cls)
