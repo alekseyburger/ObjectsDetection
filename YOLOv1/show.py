@@ -12,8 +12,9 @@ from torch.utils.data import DataLoader
 from model import Yolov1
 from dataset import VOCDataset
 from utils import (
-    get_bboxes,
-    mean_average_precision,
+    non_max_suppression,
+    cellboxes_to_boxes,
+    plot_image,
     load_checkpoint,
 )
 import pdb
@@ -37,8 +38,8 @@ for handler in logger.handlers:
             print(f"Create {logfile_dir}")
             os.makedirs(logfile_dir)
 
-parser = argparse.ArgumentParser(prog='test',
-            description='model tester')
+parser = argparse.ArgumentParser(prog='show',
+            description='invovate model and show predictions')
 parser.add_argument('-t', '--test-data', type=pathlib.Path, required = True)
 parser.add_argument('-m', '--model', type=pathlib.Path, required = True)
 parser.add_argument('-b', '--batch', default=32, help='batch size')
@@ -129,21 +130,30 @@ def main():
         drop_last=True,
     )
 
-    for iou_threshold in [i*0.1 for i in range(4,10)]:
-        for conf in [i*0.1 for i in range(1,10)]:
-            pred_boxes, target_boxes = get_bboxes(
-                test_loader,
-                model,
-                iou_threshold=iou_threshold,
-                threshold=conf,
-                device=DEVICE)
+    cls = ['aeroplane','bicycle','bird','boat',
+            'bottle','bus','car','cat',
+            'chair','cow','diningtable','dog',
+            'horse','motorbike','person','pottedplant',
+            'sheep','sofa','train','tvmonitor']
 
-            mean_avg_prec = mean_average_precision(
-                pred_boxes,
-                target_boxes,
-                iou_threshold=0.5)
-            
-            print(f'mean. avg. precision: {mean_avg_prec*100.:3.2f}% for confidence {conf:.2f} iou {iou_threshold:.2f}')
+    cont = int(args.count)
+    for images, exp_label in test_loader:
+        images = images.to(DEVICE)
+        boxes = cellboxes_to_boxes(model(images))
+        if is_ground_true:
+            boxes = cellboxes_to_boxes(exp_label.reshape(exp_label.shape[0],-1))
+
+        for idx in range(images.shape[0]):
+            best_boxes = non_max_suppression(boxes[idx],
+                                             iou_threshold = iou_threshold,
+                                             threshold = nms_hreshold)
+            for i in range(len(best_boxes)): print(best_boxes[i])
+
+            plot_image(images[idx].permute(1,2,0).to("cpu"), best_boxes, cls)
+
+            cont -= 1
+            if cont <= 0:
+                sys.exit()
 
 if __name__ == "__main__":
     main()
