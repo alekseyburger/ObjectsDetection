@@ -53,6 +53,7 @@ parser.add_argument('--no-cuda',
 parser.add_argument('-i', '--input-data', type=pathlib.Path, required = True)
 parser.add_argument('-t', '--test-data', type=pathlib.Path, required = True)
 parser.add_argument('-m', '--model', type=pathlib.Path)
+parser.add_argument('--lrate', default=2e-5, type = float, help='learning rate (2e-5)')
 
 args = parser.parse_args()
 
@@ -77,7 +78,7 @@ torch.manual_seed(seed)
 DEVICE = "cuda" if torch.cuda.is_available and not args.no_cuda else "cpu"
 BATCH_SIZE = int(args.batch)
 # Hyperparameters etc.
-LEARNING_RATE = 2e-5
+LEARNING_RATE = float(args.lrate)
 WEIGHT_DECAY = 0
 EPOCHS = int(args.epoch)
 NUM_WORKERS = 2
@@ -117,7 +118,7 @@ def pretarin_fn(train_loader, model, optimizer, loss_fn):
     for batch_idx, (x, y) in enumerate(loop):
         x, y = x.to(DEVICE), y.to(DEVICE)
         out = model(x)
-        loss = loss_fn(out, y)
+        loss = loss_fn(out, y) * x.shape[0] * x.shape[1]
         mean_loss.append(loss.item())
         optimizer.zero_grad()
         loss.backward()
@@ -139,8 +140,9 @@ def accuracy(loader, model, device='cuda'):
             y = y.to(device=device)
 
             predictions = model(x)
-            num_correct += (predictions * y).sum()
-            num_samples += y.sum()
+            num_correct += ((predictions * y) > 0.5).sum()
+            num_samples += y.sum() + 1.e-11
+            # print(num_correct, num_samples, num_correct / num_samples)
 
     model.train()
     return num_correct / num_samples
@@ -148,20 +150,21 @@ def accuracy(loader, model, device='cuda'):
 
 def main():
 
-    logger.info(f"Start train: {train_data_path} test: {test_data_path}")
+    logger.info(f"Start train: {train_data_path} test: {test_data_path} learning rate {LEARNING_RATE}")
 
     model = Yolov1(split_size=7,
                    num_boxes=2,
                    num_classes=20,
                    model_type="pretraining").to(DEVICE)
     
-    optimizer = optim.Adam(
-        model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
+    optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
     
     loss_fn = nn.MSELoss()
     if model_path:
         load_checkpoint(torch.load(model_path), model, optimizer)
+        optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
         logger.info(f"Load model {model_path}")
+    logger.info(f'Classifier {model.fcs}')
 
     train_dataset = ClassificationDataset(
         train_data_path,

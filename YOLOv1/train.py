@@ -50,6 +50,9 @@ parser.add_argument('--no-cuda',
 parser.add_argument('-i', '--input-data', type=pathlib.Path, required = True)
 parser.add_argument('-t', '--test-data', type=pathlib.Path, required = True)
 parser.add_argument('-m', '--model', type=pathlib.Path)
+parser.add_argument('--feature-extraction', type=pathlib.Path,
+                    help='feature extraction: freeze CNN , replace classification layer')
+parser.add_argument('--lrate', default=2e-5, type = float, help='learning rate (2e-5)')
 
 args = parser.parse_args()
 
@@ -68,13 +71,19 @@ if model_path and not os.path.exists(model_path):
     print("Model in not found at {model_path}")
     sys.exit(1)
 
+feature_extraction_model = args.feature_extraction
+if feature_extraction_model and not os.path.exists(feature_extraction_model):
+    print("Model in not found at {feature_extraction_model}")
+    sys.exit(1)
+
+
 seed = 123
 torch.manual_seed(seed)
 
 DEVICE = "cuda" if torch.cuda.is_available and not args.no_cuda else "cpu"
 BATCH_SIZE = int(args.batch)
 # Hyperparameters etc.
-LEARNING_RATE = 2e-5
+LEARNING_RATE = float(args.lrate)
 WEIGHT_DECAY = 0
 EPOCHS = int(args.epoch)
 NUM_WORKERS = 2
@@ -125,24 +134,60 @@ def train_fn(train_loader, model, optimizer, loss_fn):
 
     logger.info(f"Mean loss was {sum(mean_loss)/len(mean_loss)}")
 
+def nested_children(m: torch.nn.Module):
+    children = dict(m.named_children())
+    output = {}
+    if children == {}:
+        # if module has no children; m is last child! :O
+        return m
+    else:
+        # look for children from children... to the last child!
+        for name, child in children.items():
+            try:
+                output[name] = nested_children(child)
+            except TypeError:
+                output[name] = nested_children(child)
+    return output
 
 def main():
 
-    logger.info(f"Start train: {train_data_path} test: {test_data_path}")
+    logger.info(f"Start train: {train_data_path} test: {test_data_path} learning rate {LEARNING_RATE}")
 
-    model = Yolov1(split_size=7,
-                   num_boxes=2,
-                   num_classes=20).to(DEVICE)
-    optimizer = optim.Adam(
-        model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY
-    )
+    if feature_extraction_model :
+        model = Yolov1(split_size=7,
+                    num_boxes=2,
+                    num_classes=20,
+                    model_type="pretraining").to("cpu")
+        optimizer = optim.Adam(
+            model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY
+        )
+        load_checkpoint(torch.load(feature_extraction_model,map_location=torch.device("cpu")),
+                            model,
+                            optimizer)
+        logger.info(f"Load model {feature_extraction_model}")
+        logger.info(f'Original classifier {model.fcs}')
+        model.set_yolo_classifier(split_size=7,
+                    num_boxes=2,
+                    num_classes=20)
+        logger.info(f'Target classifier {model.fcs}')
+        # model.darknet_set_grad(False)
+        # model.darknet.eval()
+        optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
+        model.to(DEVICE)
+    else:
+        model = Yolov1(split_size=7,
+                    num_boxes=2,
+                    num_classes=20).to(DEVICE)
+        optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
+        if model_path:
+            load_checkpoint(torch.load(model_path,map_location=torch.device(DEVICE)),
+                            model,
+                            optimizer)
+            optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
+            model.train()
+            logger.info(f"Load model {model_path}")
+
     loss_fn = YoloLoss()
-
-    if model_path:
-        load_checkpoint(torch.load(model_path,map_location=torch.device(DEVICE)),
-                        model,
-                        optimizer)
-        logger.info(f"Load model {model_path}")
 
     train_dataset = VOCDataset(
         train_data_path,
@@ -163,7 +208,7 @@ def main():
         dataset=train_dataset,
         batch_size=BATCH_SIZE,
         num_workers=NUM_WORKERS,
-        pin_memory=PIN_MEMORY,
+        pin_memory =  True if DEVICE == "cuda" else False,
         shuffle=True,
         drop_last=True,
     )
@@ -172,7 +217,7 @@ def main():
         dataset=test_dataset,
         batch_size=BATCH_SIZE,
         num_workers=NUM_WORKERS,
-        pin_memory=PIN_MEMORY,
+        pin_memory =  True if DEVICE == "cuda" else False,
         shuffle=True,
         drop_last=True,
     )

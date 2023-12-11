@@ -56,7 +56,7 @@ class Yolov1(nn.Module):
         if model_type == "training":
             self.fcs = self._create_fcs(**kwargs)
         elif model_type == "pretraining":
-            self.fcs = self._create_pretaining_fcs(**kwargs)
+            self.fcs = self._create_pretraining_fcs(**kwargs)
         else:
             raise Exception
 
@@ -124,14 +124,21 @@ class Yolov1(nn.Module):
             nn.Linear(496, S * S * (C + B * 5)),
         )
 
-    def _create_pretaining_fcs(self, split_size, num_boxes, num_classes):
+    def _create_pretraining_fcs(self, split_size, num_boxes, num_classes):
         S, B, C = split_size, num_boxes, num_classes
 
         return nn.Sequential(
             nn.Flatten(),
-            nn.Linear(1024 * S * S, out_features=4096, bias=True),
+            nn.Linear(1024 * S * S, out_features=496*S, bias=True),
             nn.Dropout(0.0),
             nn.LeakyReLU(0.1),
-            nn.Linear(4096, C),
+            nn.Linear(496*S, C, bias=False),
             nn.Sigmoid()
         )
+
+    def set_yolo_classifier (self, **kwargs):
+        self.fcs = self._create_fcs(**kwargs)
+
+    def darknet_set_grad (self, is_grad=True):
+        for p in self.darknet.parameters():
+            p.requires_grad = is_grad
