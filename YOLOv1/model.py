@@ -118,21 +118,22 @@ class Yolov1(nn.Module):
 
         return nn.Sequential(
             nn.Flatten(),
-            nn.Linear(1024 * S * S, 496),
+            nn.Linear(1024 * S * S, 4096),
             nn.Dropout(0.0),
             nn.LeakyReLU(0.1),
-            nn.Linear(496, S * S * (C + B * 5)),
+            nn.Linear(4096, S * S * (C + B * 5)),
         )
 
     def _create_pretraining_fcs(self, split_size, num_boxes, num_classes):
         S, B, C = split_size, num_boxes, num_classes
+        lsize = C * 4096//16
 
         return nn.Sequential(
             nn.Flatten(),
-            nn.Linear(1024 * S * S, out_features=496*S, bias=True),
+            nn.Linear(1024 * S * S, out_features=lsize, bias=True),
             nn.Dropout(0.0),
             nn.LeakyReLU(0.1),
-            nn.Linear(496*S, C, bias=False),
+            nn.Linear(lsize, C, bias=False),
             nn.Sigmoid()
         )
 

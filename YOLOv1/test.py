@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """
 Main file for training Yolo model on Pascal VOC dataset
 
@@ -19,7 +20,6 @@ from utils import (
 import pdb
 
 import os, sys
-from datetime import datetime
 import argparse
 import pathlib
 import logging, logging.config

@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """
 Main file for training Yolo model on Pascal VOC dataset
 
@@ -16,11 +17,11 @@ from utils import (
     get_bboxes,
     load_checkpoint,
     save_checkpoint,
+    model_file_name
 )
 from loss import YoloLoss
 
 import os, sys
-from datetime import datetime
 import argparse
 import pathlib
 import logging, logging.config
@@ -99,14 +100,6 @@ LABEL_DIR = "data/labels"
 
 print(f"Tourch device is {DEVICE}")
 
-def model_file_name(pref : str = ""):
-    dir_name = "model"
-    if not os.path.exists(dir_name):
-        os.makedirs(dir_name)
-    current_time = datetime.now()
-    sfx = f'-{current_time.date()}'+current_time.strftime(".%H.%M.%S")
-    return dir_name + "/model-" + pref + sfx + ".pth.tar"
-
 class Compose(object):
     def __init__(self, transforms):
         self.transforms = transforms
@@ -138,20 +131,20 @@ def train_fn(train_loader, model, optimizer, loss_fn):
 
     logger.info(f"Mean loss was {sum(mean_loss)/len(mean_loss)}")
 
-def nested_children(m: torch.nn.Module):
-    children = dict(m.named_children())
-    output = {}
-    if children == {}:
-        # if module has no children; m is last child! :O
-        return m
-    else:
-        # look for children from children... to the last child!
-        for name, child in children.items():
-            try:
-                output[name] = nested_children(child)
-            except TypeError:
-                output[name] = nested_children(child)
-    return output
+# def nested_children(m: torch.nn.Module):
+#     children = dict(m.named_children())
+#     output = {}
+#     if children == {}:
+#         # if module has no children; m is last child! :O
+#         return m
+#     else:
+#         # look for children from children... to the last child!
+#         for name, child in children.items():
+#             try:
+#                 output[name] = nested_children(child)
+#             except TypeError:
+#                 output[name] = nested_children(child)
+#     return output
 
 def main():
 

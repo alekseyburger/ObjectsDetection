@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import unittest
 
 import torch
@@ -17,7 +19,8 @@ from utils import (
     plot_image,
     save_checkpoint,
     load_checkpoint,
-    convert_cellboxes
+    convert_cellboxes,
+    true_positive
 )
 from math import sqrt
 from loss import YoloLoss
@@ -41,6 +44,18 @@ def nearly_equal (expected, result):
     if expected > 10e-3:
         threshold = expected / 100.
     return abs(expected - result) < threshold
+
+class mock_model :
+    def __init__ (self, batch, predict, device):
+        self.batch = batch
+        self.DEVICE = device
+        self.predict = predict
+    def __call__ (self, dumm):
+        return self.predict.to(self.DEVICE)
+    def eval (self):
+        pass
+    def train (self):
+        pass
 
 class TestUtils(unittest.TestCase):
 
@@ -106,7 +121,7 @@ class TestUtils(unittest.TestCase):
 
         ret = convert_cellboxes(self.prediction, CELLS_PER_DIM)
 
-    def test_cellboxes_to_boxes(self):
+    def test_cellboxes_to_boxes (self):
 
         self.clean()
 
@@ -119,6 +134,47 @@ class TestUtils(unittest.TestCase):
         self.prediction[0,CELLS_PER_DIM-1,CELLS_PER_DIM-1] = torch.tensor(ouput_as_list)
 
         ret = cellboxes_to_boxes(self.prediction, CELLS_PER_DIM)
+
+    def test_true_positive (self):
+        batch = 1
+        DEVICE = "cpu"
+        input = torch.rand(batch, 448, 448, 3).to(DEVICE)
+
+        predict = torch.ones(batch, CLASSES_NUM).to(DEVICE)
+        model = mock_model(batch, predict = predict, device=DEVICE)        
+        target = torch.zeros(batch, CLASSES_NUM).to(DEVICE)
+        loader = [(input, target)]
+        print( true_positive(loader, model, device=DEVICE) )
+
+        predict = torch.zeros(batch, CLASSES_NUM)
+        model = mock_model(batch, predict = predict, device=DEVICE)        
+        target = torch.zeros(batch, CLASSES_NUM).to(DEVICE)
+        loader = [(input, target)]
+        print( true_positive(loader, model, device=DEVICE) )
+
+        predict = torch.zeros(batch, CLASSES_NUM)
+        model = mock_model(batch, predict = predict, device=DEVICE)        
+        target = torch.ones(batch, CLASSES_NUM).to(DEVICE)
+        loader = [(input, target)]
+        print( true_positive(loader, model, device=DEVICE) )
+
+        predict = torch.ones(batch, CLASSES_NUM)
+        model = mock_model(batch, predict = predict, device=DEVICE)        
+        target = torch.ones(batch, CLASSES_NUM).to(DEVICE)
+        loader = [(input, target)]
+        print( true_positive(loader, model, device=DEVICE) )
+
+        predict = torch.tensor([1.  if c < CLASSES_NUM // 2  else 0. for c in range(CLASSES_NUM) ]).repeat(batch,CLASSES_NUM)
+        target =  torch.tensor([0.  if c < CLASSES_NUM // 2  else 1. for c in range(CLASSES_NUM) ]).repeat(batch,CLASSES_NUM)
+        model = mock_model(batch, predict = predict, device=DEVICE)        
+        loader = [(input, target)]
+        print( true_positive(loader, model, device=DEVICE) )
+
+        predict = torch.tensor([1.  if c < CLASSES_NUM // 2  else 0. for c in range(CLASSES_NUM) ]).repeat(batch,CLASSES_NUM)
+        target =  predict
+        model = mock_model(batch, predict = predict, device=DEVICE)        
+        loader = [(input, target)]
+        print( true_positive(loader, model, device=DEVICE) )
 
 if __name__ == '__main__':
     unittest.main()

@@ -8,6 +8,8 @@ from model_output import CELLS_PER_DIM, CLASSES_NUM, BOXES_NUM, BOXES_AREA_LEN, 
 from model_output import moutput_box_confidence, moutput_confidences, moutput_box, moutput_box_center, moutput_box_h_w
 from model_output import box_center, box_h_w
 
+from datetime import datetime
+import os
 import pdb
 
 def intersection_over_union(prediction_box, target_box, hw_image_proportional = False):
@@ -353,3 +355,46 @@ def load_checkpoint(checkpoint, model, optimizer):
     print("=> Loading checkpoint")
     model.load_state_dict(checkpoint["state_dict"])
     optimizer.load_state_dict(checkpoint["optimizer"])
+
+def model_file_name(pref : str = ""):
+    dir_name = "model"
+    if not os.path.exists(dir_name):
+        os.makedirs(dir_name)
+    current_time = datetime.now()
+    sfx = f'-{current_time.date()}-'+current_time.strftime("%H:%M:%S")
+    return dir_name + "/model-" + pref + sfx + ".pth.tar"
+
+def true_positive (loader, model, device='cuda'):
+    num_correct = 0
+    num_samples = 0
+    model.eval()
+
+    with torch.no_grad():
+        for x, target in loader:
+            x = x.to(device=device)
+            target = target.to(device=device)
+
+            predictions = model(x)
+            num_correct += ((predictions * target) > .9).sum()
+            num_samples += target.sum()
+
+    model.train()
+    return num_correct / (num_samples + 1.e-11)
+
+def true_negative (loader, model, device='cuda'):
+    num_correct = 0
+    num_samples = 0
+    model.eval()
+
+    with torch.no_grad():
+        for x, target in loader:
+            x = x.to(device=device)
+            target = target.to(device=device)
+
+            predictions = model(x)
+            negative_targets = (1. - target)
+            num_correct +=  ((negative_targets * predictions) < 0.1).sum()
+            num_samples += negative_targets.sum()
+
+    model.train()
+    return num_correct / (num_samples + 1.e-11)

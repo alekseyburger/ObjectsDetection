@@ -18,12 +18,15 @@ from utils import (
     get_bboxes,
     load_checkpoint,
     save_checkpoint,
+    model_file_name,
+    true_positive,
+    true_negative
 )
 from loss import YoloLoss
 from model_output import CLASSES_NUM
 
 import os, sys
-from datetime import datetime
+
 import argparse
 import pathlib
 import logging, logging.config
@@ -54,7 +57,11 @@ parser.add_argument('--show',
                     const=True,
                     default=False,
                     help='Show images with classes')
-
+parser.add_argument('--accuracy',
+                    action='store_const',
+                    const=True,
+                    default=False,
+                    help='calculate true positive/negative accuracy')
 
 args = parser.parse_args()
 
@@ -103,14 +110,6 @@ LABEL_DIR = "data/labels"
 
 print(f"Tourch device is {DEVICE}")
 
-def model_file_name(pref : str = ""):
-    dir_name = "model"
-    if not os.path.exists(dir_name):
-        os.makedirs(dir_name)
-    current_time = datetime.now()
-    sfx = f'-{current_time.date()}'+current_time.strftime(".%H.%M.%S")
-    return dir_name + "/model-" + pref + sfx + ".pth.tar"
-
 class Compose(object):
     def __init__(self, transforms):
         self.transforms = transforms
@@ -131,7 +130,7 @@ def pretarin_fn(train_loader, model, optimizer, loss_fn):
     for batch_idx, (x, y) in enumerate(loop):
         x, y = x.to(DEVICE), y.to(DEVICE)
         out = model(x)
-        loss = loss_fn(out, y) * x.shape[1]
+        loss = loss_fn(out, y) # * y.shape[1]
         mean_loss.append(loss.item())
         optimizer.zero_grad()
         loss.backward()
@@ -141,26 +140,6 @@ def pretarin_fn(train_loader, model, optimizer, loss_fn):
         loop.set_postfix(loss=loss.item())
 
     logger.info(f"Mean loss was {sum(mean_loss)/len(mean_loss)}")
-
-def accuracy(loader, model, device='cuda'):
-    num_correct = 0
-    num_samples = 0
-    model.eval()
-
-    with torch.no_grad():
-        for x, y in loader:
-            x = x.to(device=device)
-            y = y.to(device=device)
-
-            predictions = model(x)
-            num_correct += ((predictions * y) > .9).sum()
-            #num_correct +=  (((y < 1.) * predictions) < 0.1).sum()
-            num_samples += y.sum()
-            #num_samples += y.shape[0] * y.shape[1]
-
-    model.train()
-    return num_correct / (num_samples + 1.e-11)
-
 
 def main():
 
@@ -217,20 +196,20 @@ def main():
         "optimizer": optimizer.state_dict(),
     }
 
-    best_accuracy = 0.9
+    best_true_positive = 0.9
     reason = 'final'
 
     try:
         for epoch in range(EPOCHS):
 
-            current_accuracy = accuracy(test_loader, model, device=DEVICE)
+            current_true_positive = true_positive(test_loader, model, device=DEVICE)
 
             logger.info(f"EPOCH {epoch}/{EPOCHS}")
-            logger.info(f"Accuracy: {current_accuracy}")
+            logger.info(f"Accuracy: {current_true_positive}")
 
-            if current_accuracy > best_accuracy:
-                best_accuracy = current_accuracy
-                cp_filename = model_file_name(f'CNN-best-mAP{current_accuracy:.2f}')
+            if current_true_positive > best_true_positive:
+                best_true_positive = current_true_positive
+                cp_filename = model_file_name(f'CNN-best-mAP{current_true_positive:.2f}')
                 save_checkpoint(checkpoint,filename = cp_filename)
                 logger.info(f"Save model {cp_filename}")
             
@@ -241,14 +220,14 @@ def main():
         reason = "Interrupted"
         pass
 
-    cp_filename = model_file_name(f'CNN-{reason}-mAP{current_accuracy:.2f}')
+    cp_filename = model_file_name(f'CNN-{reason}-mAP{current_true_positive:.2f}')
     save_checkpoint(checkpoint, filename = cp_filename)
     logger.info(f"Save model {cp_filename}")
 
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import numpy as np
-def test():
+def run_show():
 
     model = Yolov1(split_size=7,
                    num_boxes=2,
@@ -256,9 +235,9 @@ def test():
                    model_type="pretraining").to(DEVICE)
     optimizer = optim.Adam(
         model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
-    if model_path:
-        load_checkpoint(torch.load(model_path, map_location=torch.device(DEVICE)), model, optimizer)
-        logger.info(f"Load model {model_path}")
+ 
+    load_checkpoint(torch.load(model_path, map_location=torch.device(DEVICE)), model, optimizer)
+    logger.info(f"Load model {model_path}")
 
     test_dataset = ClassificationDataset(
         test_data_path,
@@ -284,10 +263,10 @@ def test():
 
     for images, exp_label in test_loader:
         images = images.to(DEVICE)
-        class_prediction = (model(images))
+        class_predictions = (model(images))
 
         for idx in range(images.shape[0]):
-            name_list = [cls[i] for i in range(CLASSES_NUM)  if class_prediction[idx][i] > .5]
+            name_list = [cls[i] for i in range(CLASSES_NUM)  if class_predictions[idx][i] > .5]
             exp_list = [cls[i] for i in range(CLASSES_NUM)  if exp_label[idx][i] > .9]
             im = np.array(images[idx].permute(1,2,0).to("cpu"))
             # Create figure and axes
@@ -297,7 +276,41 @@ def test():
             plt.title(','.join(name_list)+':'+','.join(exp_list))
             plt.show()
 
+def run_accuracy():
+
+    model = Yolov1(split_size=7,
+                   num_boxes=2,
+                   num_classes=20,
+                   model_type="pretraining").to(DEVICE)
+    optimizer = optim.Adam(
+        model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
+
+    load_checkpoint(torch.load(model_path, map_location=torch.device(DEVICE)), model, optimizer)
+    logger.info(f"Load model {model_path}")
+
+    test_dataset = ClassificationDataset(
+        test_data_path,
+        transform=transform,
+        img_dir=IMG_DIR,
+        label_dir=LABEL_DIR,
+    )
+
+    test_loader = DataLoader(
+        dataset=test_dataset,
+        batch_size=BATCH_SIZE,
+        num_workers=NUM_WORKERS,
+        pin_memory =  True if DEVICE == "cuda" else False,
+        shuffle=True,
+        drop_last=True,
+    )
+
+    logger.info(f'True positive  {true_positive(test_loader, model, device=DEVICE)}')
+    logger.info(f'True negative  {true_negative(test_loader, model, device=DEVICE)}')
 
 if __name__ == "__main__":
-    if not args.show: main()
-    else: test()
+    if args.show:
+        run_show()
+    elif args.accuracy:
+        run_accuracy()
+    else:
+        main()
