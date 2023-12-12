@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """
 Main file for training Yolo model on Pascal VOC dataset
 
@@ -29,17 +30,6 @@ import logging, logging.config
 
 import pdb
 
-logging.config.fileConfig("loggin.conf")
-logger = logging.getLogger("pretrainLog")
-
-for handler in logger.handlers:
-    if hasattr(handler, "baseFilename"):
-        logfile_name = getattr(handler, 'baseFilename')
-        logfile_name = os.path.abspath(logfile_name)
-        logfile_dir = os.path.dirname(logfile_name)
-        if not os.path.exists(logfile_dir):
-            print(f"Create {logfile_dir}")
-            os.makedirs(logfile_dir)
 
 parser = argparse.ArgumentParser(prog='pretrain',
             description='model trainer')
@@ -54,6 +44,17 @@ parser.add_argument('-i', '--input-data', type=pathlib.Path, required = True)
 parser.add_argument('-t', '--test-data', type=pathlib.Path, required = True)
 parser.add_argument('-m', '--model', type=pathlib.Path)
 parser.add_argument('--lrate', default=2e-5, type = float, help='learning rate (2e-5)')
+parser.add_argument('--no-log',
+                    action='store_const',
+                    const=True,
+                    default=False,
+                    help='disable logging to file')
+parser.add_argument('--show',
+                    action='store_const',
+                    const=True,
+                    default=False,
+                    help='Show images with classes')
+
 
 args = parser.parse_args()
 
@@ -71,6 +72,18 @@ model_path = args.model
 if model_path and not os.path.exists(model_path):
     print("Model in not found at {model_path}")
     sys.exit(1)
+
+logging.config.fileConfig("loggin.conf")
+logger = logging.getLogger("pretrainLog" if not args.no_log else "debugLog")
+for handler in logger.handlers:
+    if hasattr(handler, "baseFilename"):
+        logfile_name = getattr(handler, 'baseFilename')
+        logfile_name = os.path.abspath(logfile_name)
+        logfile_dir = os.path.dirname(logfile_name)
+        if not os.path.exists(logfile_dir):
+            print(f"Create {logfile_dir}")
+            os.makedirs(logfile_dir)
+
 
 seed = 123
 torch.manual_seed(seed)
@@ -118,7 +131,7 @@ def pretarin_fn(train_loader, model, optimizer, loss_fn):
     for batch_idx, (x, y) in enumerate(loop):
         x, y = x.to(DEVICE), y.to(DEVICE)
         out = model(x)
-        loss = loss_fn(out, y) * x.shape[0] * x.shape[1]
+        loss = loss_fn(out, y) * x.shape[1]
         mean_loss.append(loss.item())
         optimizer.zero_grad()
         loss.backward()
@@ -140,12 +153,13 @@ def accuracy(loader, model, device='cuda'):
             y = y.to(device=device)
 
             predictions = model(x)
-            num_correct += ((predictions * y) > 0.5).sum()
-            num_samples += y.sum() + 1.e-11
-            # print(num_correct, num_samples, num_correct / num_samples)
+            num_correct += ((predictions * y) > .9).sum()
+            #num_correct +=  (((y < 1.) * predictions) < 0.1).sum()
+            num_samples += y.sum()
+            #num_samples += y.shape[0] * y.shape[1]
 
     model.train()
-    return num_correct / num_samples
+    return num_correct / (num_samples + 1.e-11)
 
 
 def main():
@@ -161,7 +175,7 @@ def main():
     
     loss_fn = nn.MSELoss()
     if model_path:
-        load_checkpoint(torch.load(model_path), model, optimizer)
+        load_checkpoint(torch.load(model_path, map_location=torch.device(DEVICE)), model, optimizer)
         optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
         logger.info(f"Load model {model_path}")
     logger.info(f'Classifier {model.fcs}')
@@ -243,7 +257,7 @@ def test():
     optimizer = optim.Adam(
         model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
     if model_path:
-        load_checkpoint(torch.load(model_path), model, optimizer)
+        load_checkpoint(torch.load(model_path, map_location=torch.device(DEVICE)), model, optimizer)
         logger.info(f"Load model {model_path}")
 
     test_dataset = ClassificationDataset(
@@ -274,15 +288,16 @@ def test():
 
         for idx in range(images.shape[0]):
             name_list = [cls[i] for i in range(CLASSES_NUM)  if class_prediction[idx][i] > .5]
+            exp_list = [cls[i] for i in range(CLASSES_NUM)  if exp_label[idx][i] > .9]
             im = np.array(images[idx].permute(1,2,0).to("cpu"))
             # Create figure and axes
             fig, ax = plt.subplots(1)
             # Display the image
             ax.imshow(im)
-            plt.title(','.join(name_list))
+            plt.title(','.join(name_list)+':'+','.join(exp_list))
             plt.show()
 
 
 if __name__ == "__main__":
-    main()
-    #test()
+    if not args.show: main()
+    else: test()

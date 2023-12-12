@@ -26,18 +26,6 @@ import pathlib
 import logging, logging.config
 
 
-logging.config.fileConfig("loggin.conf")
-logger = logging.getLogger("trainLog")
-
-for handler in logger.handlers:
-    if hasattr(handler, "baseFilename"):
-        logfile_name = getattr(handler, 'baseFilename')
-        logfile_name = os.path.abspath(logfile_name)
-        logfile_dir = os.path.dirname(logfile_name)
-        if not os.path.exists(logfile_dir):
-            print(f"Create {logfile_dir}")
-            os.makedirs(logfile_dir)
-
 parser = argparse.ArgumentParser(prog='train',
             description='model trainer')
 parser.add_argument('-e', '--epoch', default=100, help='epohs number')
@@ -53,6 +41,11 @@ parser.add_argument('-m', '--model', type=pathlib.Path)
 parser.add_argument('--feature-extraction', type=pathlib.Path,
                     help='feature extraction: freeze CNN , replace classification layer')
 parser.add_argument('--lrate', default=2e-5, type = float, help='learning rate (2e-5)')
+parser.add_argument('--no-log',
+                    action='store_const',
+                    const=True,
+                    default=False,
+                    help='disable logging to file')
 
 args = parser.parse_args()
 
@@ -76,6 +69,17 @@ if feature_extraction_model and not os.path.exists(feature_extraction_model):
     print("Model in not found at {feature_extraction_model}")
     sys.exit(1)
 
+logging.config.fileConfig("loggin.conf")
+logger = logging.getLogger("trainLog" if not args.no_log else "debugLog")
+
+for handler in logger.handlers:
+    if hasattr(handler, "baseFilename"):
+        logfile_name = getattr(handler, 'baseFilename')
+        logfile_name = os.path.abspath(logfile_name)
+        logfile_dir = os.path.dirname(logfile_name)
+        if not os.path.exists(logfile_dir):
+            print(f"Create {logfile_dir}")
+            os.makedirs(logfile_dir)
 
 seed = 123
 torch.manual_seed(seed)
@@ -170,7 +174,7 @@ def main():
                     num_boxes=2,
                     num_classes=20)
         logger.info(f'Target classifier {model.fcs}')
-        # model.darknet_set_grad(False)
+        model.darknet_set_grad(False)
         # model.darknet.eval()
         optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
         model.to(DEVICE)

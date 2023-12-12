@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """
 Main file for training Yolo model on Pascal VOC dataset
 
