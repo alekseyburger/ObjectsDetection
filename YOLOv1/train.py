@@ -166,7 +166,9 @@ def main():
         model.set_yolo_classifier(split_size=7,
                     num_boxes=2,
                     num_classes=20)
+        model.fcs.train()
         logger.info(f'Target classifier {model.fcs}')
+
         model.darknet_set_grad(False)
         # model.darknet.eval()
         optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
@@ -230,26 +232,27 @@ def main():
     try:
         for epoch in range(EPOCHS):
 
-            pred_boxes, target_boxes = get_bboxes(
-                test_loader,
-                model,
-                iou_threshold=0.5,
-                threshold=0.4,
-                device=DEVICE)
+            with torch.no_grad():
+                pred_boxes, target_boxes = get_bboxes(
+                    test_loader,
+                    model,
+                    iou_threshold=0.5,
+                    threshold=0.4,
+                    device=DEVICE)
 
-            mean_avg_prec = mean_average_precision(
-                pred_boxes,
-                target_boxes,
-                iou_threshold=0.5)
+                mean_avg_prec = mean_average_precision(
+                    pred_boxes,
+                    target_boxes,
+                    iou_threshold=0.5)
 
-            logger.info(f"EPOCH {epoch}/{EPOCHS}")
-            logger.info(f"Train mAP: {mean_avg_prec}")
+                logger.info(f"EPOCH {epoch}/{EPOCHS}")
+                logger.info(f"Train mAP: {mean_avg_prec}")
 
-            if mean_avg_prec > best_mean_avg:
-                best_mean_avg = mean_avg_prec
-                cp_filename = model_file_name(f'best-mAP{mean_avg_prec:.2f}')
-                save_checkpoint(checkpoint,filename = cp_filename)
-                logger.info(f"Save model {cp_filename}")
+                if mean_avg_prec > best_mean_avg:
+                    best_mean_avg = mean_avg_prec
+                    cp_filename = model_file_name(f'best-mAP{mean_avg_prec:.2f}')
+                    save_checkpoint(checkpoint,filename = cp_filename)
+                    logger.info(f"Save model {cp_filename}")
 
             train_fn(train_loader, model, optimizer, loss_fn)
 

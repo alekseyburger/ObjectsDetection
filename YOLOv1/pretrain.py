@@ -156,6 +156,7 @@ def main():
     if model_path:
         load_checkpoint(torch.load(model_path, map_location=torch.device(DEVICE)), model, optimizer)
         optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
+        model.train()
         logger.info(f"Load model {model_path}")
     logger.info(f'Classifier {model.fcs}')
 

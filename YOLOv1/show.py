@@ -114,6 +114,7 @@ def main():
     load_checkpoint(torch.load(model_path, map_location=torch.device(DEVICE)),
                     model,
                     optimizer)
+    model.eval()
 
     test_dataset = VOCDataset(
         test_data_path,
