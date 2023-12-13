@@ -67,17 +67,17 @@ args = parser.parse_args()
 
 train_data_path = args.input_data
 if not os.path.exists(train_data_path):
-    print("Train data in not found at {train_data_path}")
+    print(f"Train data in not found at {train_data_path}")
     sys.exit(1)
 
 test_data_path = args.test_data
 if not os.path.exists(test_data_path):
-    print("Test data in not found at {test_data_path}")
+    print(f"Test data in not found at {test_data_path}")
     sys.exit(1)
 
 model_path = args.model
 if model_path and not os.path.exists(model_path):
-    print("Model in not found at {model_path}")
+    print(f"Model in not found at {model_path}")
     sys.exit(1)
 
 logging.config.fileConfig("loggin.conf")
@@ -141,7 +141,7 @@ def pretarin_fn(train_loader, model, optimizer, loss_fn):
 
     logger.info(f"Mean loss was {sum(mean_loss)/len(mean_loss)}")
 
-def main():
+def train():
 
     logger.info(f"Start train: {train_data_path} test: {test_data_path} learning rate {LEARNING_RATE}")
 
@@ -314,4 +314,4 @@ if __name__ == "__main__":
     elif args.accuracy:
         run_accuracy()
     else:
-        main()
+        train()
