@@ -382,6 +382,29 @@ def true_positive (loader, model, device='cuda'):
     model.train()
     return num_correct / (num_samples + 1.e-11)
 
+def true_positive_per_class  (loader, model, device='cuda'):
+    model.eval()
+
+    class_correct = None
+    class_samples = None
+
+    with torch.no_grad():
+        for x, target in loader:
+            x = x.to(device=device)
+            target = target.to(device=device)
+
+            predictions = model(x)
+            class_count = predictions.shape[-1]
+            if class_correct is None:
+                class_correct = [0 for c in range(class_count)]
+                class_samples = [0 for c in range(class_count)]
+            for c in range(class_count):
+                class_correct[c] += ((predictions * target)[...,c] > .9).sum().item()
+                class_samples[c] += int(target[...,c].sum().item())
+
+    model.train()
+    return class_correct, class_samples
+
 def true_negative (loader, model, device='cuda'):
     model.eval()
 
@@ -416,13 +439,13 @@ def true_negative_per_class (loader, model, device='cuda'):
             predictions = model(x)
             class_count = predictions.shape[-1]
             if class_correct is None:
-                class_correct = [0. for c in range(class_count)]
-                class_samples = [0. for c in range(class_count)]
+                class_correct = [0 for c in range(class_count)]
+                class_samples = [0 for c in range(class_count)]
 
             negative_targets = (1. - target)
             for c in range(class_count):
                 class_correct[c] +=  ((negative_targets * predictions)[...,c] < 0.1).sum().item()
-                class_samples[c] += negative_targets[...,c].sum().item()
+                class_samples[c] += int(negative_targets[...,c].sum().item())
 
     model.train()
     return class_correct, class_samples
@@ -444,3 +467,26 @@ def false_positive (loader, model, device='cuda'):
 
     model.train()
     return num_correct / (num_samples + 1.e-11)
+
+def false_positive_per_class (loader, model, device='cuda'):
+    model.eval()
+
+    class_correct = None
+    class_samples = None
+
+    with torch.no_grad():
+        for x, target in loader:
+            x = x.to(device=device)
+            target = target.to(device=device)
+
+            predictions = model(x)
+            class_count = predictions.shape[-1]
+            if class_correct is None:
+                class_correct = [0 for c in range(class_count)]
+                class_samples = [0 for c in range(class_count)]
+            for c in range(class_count):   
+                class_correct[c] += ((predictions * target)[...,c] > .9).sum().item()
+                class_samples[c] += int((1. - target)[...,c].sum().item())
+
+    model.train()
+    return class_correct, class_samples
