@@ -20,7 +20,9 @@ from utils import (
     save_checkpoint,
     model_file_name,
     true_positive,
-    true_negative
+    true_negative,
+    false_positive,
+    true_negative_per_class
 )
 from loss import YoloLoss
 from model_output import CLASSES_NUM
@@ -228,6 +230,13 @@ def train():
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import numpy as np
+
+cls = ['aeroplane','bicycle','bird','boat',
+        'bottle','bus','car','cat',
+        'chair','cow','diningtable','dog',
+        'horse','motorbike','person','pottedplant',
+        'sheep','sofa','train','tvmonitor']
+
 def run_show():
 
     model = Yolov1(split_size=7,
@@ -256,11 +265,6 @@ def run_show():
         drop_last=True,
     )
 
-    cls = ['aeroplane','bicycle','bird','boat',
-            'bottle','bus','car','cat',
-            'chair','cow','diningtable','dog',
-            'horse','motorbike','person','pottedplant',
-            'sheep','sofa','train','tvmonitor']
 
     for images, exp_label in test_loader:
         images = images.to(DEVICE)
@@ -307,8 +311,37 @@ def run_accuracy():
         drop_last=True,
     )
 
-    logger.info(f'True positive  {true_positive(test_loader, model, device=DEVICE)}')
-    logger.info(f'True negative  {true_negative(test_loader, model, device=DEVICE)}')
+    # logger.info(f'Test Data: True positive  {true_positive(test_loader, model, device=DEVICE)}')
+    # logger.info(f'Test Data: False positive  {false_positive(test_loader, model, device=DEVICE)}')
+    logger.info(f'Test Data: True negative')
+    class_correct, class_samples = true_negative_per_class(test_loader, model, device=DEVICE)
+    for c in range(CLASSES_NUM):
+        logger.info( f'{cls[c]} {c}: {class_correct[c]} correct from {class_samples[c]} {class_correct[c]/(class_samples[c] + 1.e-11)} ' )
+    logger.info( f'Commulative {sum(class_correct)} from {sum(class_samples)} : {sum(class_correct)/(sum(class_samples) + 1.e-11)}' )
+
+    train_dataset = ClassificationDataset(
+        train_data_path,
+        transform=transform,
+        img_dir=IMG_DIR,
+        label_dir=LABEL_DIR,
+    )
+
+    train_loader = DataLoader(
+        dataset=train_dataset,
+        batch_size=BATCH_SIZE,
+        num_workers=NUM_WORKERS,
+        pin_memory =  True if DEVICE == "cuda" else False,
+        shuffle=True,
+        drop_last=True,
+    )
+
+    # logger.info(f'Train Data: True positive  {true_positive(train_loader, model, device=DEVICE)}')
+    # logger.info(f'Train Data: True negative  {false_positive(test_loader, model, device=DEVICE)}')
+    logger.info(f'Train Data: True negative')
+    class_correct, class_samples = true_negative_per_class(train_loader, model, device=DEVICE)
+    for c in range(CLASSES_NUM):
+        logger.info( f'{cls[c]} {c}: {class_correct[c]} correct from {class_samples[c]} {class_correct[c]/(class_samples[c] + 1.e-11)} ' )
+    logger.info( f'Commulative {sum(class_correct)} from {sum(class_samples)} : {sum(class_correct)/(sum(class_samples) + 1.e-11)}' )
 
 if __name__ == "__main__":
     if args.show:
