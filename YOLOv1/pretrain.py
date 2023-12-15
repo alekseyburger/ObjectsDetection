@@ -108,7 +108,7 @@ LOAD_MODEL = False
 IMG_DIR = "data/images"
 LABEL_DIR = "data/labels"
 
-print(f"Tourch device is {DEVICE}")
+logger.info(f"pretrain: torch device is {DEVICE}")
 
 class Compose(object):
     def __init__(self, transforms):
@@ -278,6 +278,8 @@ def run_show():
             plt.show()
 
 def run_accuracy():
+
+    logger.info(f"Start accuracy check: {train_data_path} test: {test_data_path}")
 
     model = Yolov1(split_size=7,
                    num_boxes=2,

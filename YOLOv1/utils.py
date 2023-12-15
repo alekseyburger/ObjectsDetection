@@ -361,8 +361,8 @@ def model_file_name(pref : str = ""):
     if not os.path.exists(dir_name):
         os.makedirs(dir_name)
     current_time = datetime.now()
-    sfx = f'-{current_time.date()}-'+current_time.strftime("%H:%M:%S")
-    return dir_name + "/model-" + pref + sfx + ".pth.tar"
+    sfx = f'-{current_time.date()}-'+current_time.strftime("%H.%M.%S")
+    return os.path.join("model", "model-" + pref + sfx + ".pth.tar")
 
 def true_positive (loader, model, device='cuda'):
     num_correct = 0

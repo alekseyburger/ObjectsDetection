@@ -98,7 +98,7 @@ LOAD_MODEL = False
 IMG_DIR = "data/images"
 LABEL_DIR = "data/labels"
 
-print(f"Tourch device is {DEVICE}")
+logger.info(f"train torch device is {DEVICE}")
 
 class Compose(object):
     def __init__(self, transforms):

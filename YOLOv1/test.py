@@ -87,7 +87,7 @@ PIN_MEMORY = True
 IMG_DIR = "data/images"
 LABEL_DIR = "data/labels"
 
-print(f"Tourch device is {DEVICE}")
+logger.info(f"test torch device is {DEVICE}")
 
 class Compose(object):
     def __init__(self, transforms):
