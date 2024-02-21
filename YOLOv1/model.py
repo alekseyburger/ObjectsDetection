@@ -13,7 +13,7 @@ Tuple is structured by (kernel_size, filters, stride, padding)
 List is structured by tuples and lastly int with number of repeats
 """
 
-architecture_config = [
+cnn_architecture_config = [
     (7, 64, 2, 3),
     "M",
     (3, 192, 1, 1),
@@ -28,10 +28,16 @@ architecture_config = [
     (3, 1024, 1, 1),
     "M",
     [(1, 512, 1, 0), (3, 1024, 1, 1), 2],
-    (3, 1024, 1, 1),
-    (3, 1024, 2, 1),
-    (3, 1024, 1, 1),
-    (3, 1024, 1, 1),
+    # (3, 1024, 1, 1),
+    # (3, 1024, 2, 1),
+    # (3, 1024, 1, 1),
+    # (3, 1024, 1, 1),
+]
+reduction_architecture_config = [
+     (3, 1024, 1, 1),
+     (3, 1024, 2, 1),
+     (3, 1024, 1, 1),
+     (3, 1024, 1, 1),
 ]
 
 
@@ -47,26 +53,33 @@ class CNNBlock(nn.Module):
 
 
 class Yolov1(nn.Module):
+    """
+    Model input (batch, in_channels=3, 448,448)
+    """
 
     def __init__(self, in_channels=3, model_type = "training", **kwargs):
         super(Yolov1, self).__init__()
-        self.architecture = architecture_config
+
         self.in_channels = in_channels
-        self.darknet = self._create_conv_layers(self.architecture)
-        if model_type == "training":
-            self.fcs = self._create_fcs(**kwargs)
-        elif model_type == "pretraining":
-            self.fcs = self._create_pretraining_fcs(**kwargs)
+        # it returns output chennals number in self.in_channels
+        self.cnn = self._create_conv_layers(cnn_architecture_config, self.in_channels)
+        self.reduction = None
+        self.is_pretraining = model_type == "pretraining"
+
+        if self.is_pretraining:
+            self.fcs = self._create_pretraining_fcs(self.in_channels, **kwargs)
         else:
-            raise Exception
+            self.reduction = self._create_conv_layers(reduction_architecture_config, self.in_channels)
+            self.fcs = self._create_fcs(self.in_channels, **kwargs)
 
     def forward(self, x):
-        x = self.darknet(x)
-        return self.fcs(torch.flatten(x, start_dim=1))
+        x = self.cnn(x)             #torch.Size([batch, 1024, 14, 14])
+        if self.reduction:
+            x = self.reduction(x)   #torch.Size([batch, 1024, 7, 7])
+        return self.fcs(x)
 
-    def _create_conv_layers(self, architecture):
+    def _create_conv_layers(self, architecture, in_channels):
         layers = []
-        in_channels = self.in_channels
 
         for x in architecture:
             if type(x) == tuple:
@@ -105,10 +118,10 @@ class Yolov1(nn.Module):
                         )
                     ]
                     in_channels = conv2[1]
-
+            self.in_channels = in_channels
         return nn.Sequential(*layers)
 
-    def _create_fcs(self, split_size, num_boxes, num_classes):
+    def _create_fcs(self, in_channals, split_size, num_boxes, num_classes):
         S, B, C = split_size, num_boxes, num_classes
 
         # In original paper this should be
@@ -118,19 +131,20 @@ class Yolov1(nn.Module):
 
         return nn.Sequential(
             nn.Flatten(),
-            nn.Linear(1024 * S * S, 4096),
+            nn.Linear(in_channals * S * S, 4096),
             nn.Dropout(0.0),
             nn.LeakyReLU(0.1),
             nn.Linear(4096, S * S * (C + B * 5)),
         )
 
-    def _create_pretraining_fcs(self, split_size, num_boxes, num_classes):
+    def _create_pretraining_fcs(self, in_channals, split_size, num_boxes, num_classes):
         S, B, C = split_size, num_boxes, num_classes
-        lsize = C * 4096//16
+        # Fit model to available GPU resources
+        lsize = C * 4096//64
 
         return nn.Sequential(
             nn.Flatten(),
-            nn.Linear(1024 * S * S, out_features=lsize, bias=True),
+            nn.Linear(in_features = in_channals * 4 * S * S, out_features=lsize, bias=True),
             nn.Dropout(0.0),
             nn.LeakyReLU(0.1),
             nn.Linear(lsize, C, bias=False),
@@ -138,8 +152,18 @@ class Yolov1(nn.Module):
         )
 
     def set_yolo_classifier (self, **kwargs):
-        self.fcs = self._create_fcs(**kwargs)
+        self.reduction = self._create_conv_layers(reduction_architecture_config, 1024)
+        self.fcs = self._create_fcs(1024, **kwargs)
 
-    def darknet_set_grad (self, is_grad=True):
-        for p in self.darknet.parameters():
+    def cnn_set_grad (self, is_grad=True):
+        for p in self.cnn.parameters():
             p.requires_grad = is_grad
+
+
+if __name__ == "__main__":
+    # test model output
+    x = torch.randn((8, 3, 448,448))
+    pretrain_model = Yolov1(split_size=7, num_boxes=2, num_classes=20, model_type="pretraining")
+    print(pretrain_model(x).shape)
+    train_model = Yolov1(split_size=7, num_boxes=2, num_classes=20, model_type="training")
+    print(train_model(x).shape)

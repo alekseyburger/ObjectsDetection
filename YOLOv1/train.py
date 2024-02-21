@@ -38,6 +38,7 @@ parser.add_argument('--no-cuda',
                     help='disable GPU')
 parser.add_argument('-i', '--input-data', type=pathlib.Path, required = True)
 parser.add_argument('-t', '--test-data', type=pathlib.Path, required = True)
+parser.add_argument('-d', '--data-dir', type=pathlib.Path, required = False)
 parser.add_argument('-m', '--model', type=pathlib.Path)
 parser.add_argument('--feature-extraction', type=pathlib.Path,
                     help='feature extraction: freeze CNN , replace classification layer')
@@ -95,8 +96,16 @@ NUM_WORKERS = 2
 PIN_MEMORY = True
 LOAD_MODEL = False
 
-IMG_DIR = "data/images"
-LABEL_DIR = "data/labels"
+data_dir_path = args.data_dir
+if data_dir_path:
+    if not os.path.exists(data_dir_path):
+        print(f"Data path is not exist {data_dir_path}")
+        sys.exit(1)
+else:
+    data_dir_path = "data"
+
+IMG_DIR = os.path.join(data_dir_path, "images")
+LABEL_DIR = os.path.join(data_dir_path, "labels")
 
 logger.info(f"train torch device is {DEVICE}")
 
@@ -148,7 +157,7 @@ def train_fn(train_loader, model, optimizer, loss_fn):
 
 def main():
 
-    logger.info(f"Start train: {train_data_path} test: {test_data_path} learning rate {LEARNING_RATE}")
+    logger.info(f"Start train: {train_data_path} test: {test_data_path} batch: {BATCH_SIZE} learning rate {LEARNING_RATE}")
 
     if feature_extraction_model :
         model = Yolov1(split_size=7,
@@ -169,8 +178,8 @@ def main():
         model.fcs.train()
         logger.info(f'Target classifier {model.fcs}')
 
-        model.darknet_set_grad(False)
-        # model.darknet.eval()
+        model.cnn_set_grad(False)
+        # model.cnn.eval()
         optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
         model.to(DEVICE)
     else:
