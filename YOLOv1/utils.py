@@ -364,11 +364,12 @@ def model_file_name(pref : str = ""):
     sfx = f'-{current_time.date()}-'+current_time.strftime("%H.%M.%S")
     return os.path.join("model", "model-" + pref + sfx + ".pth.tar")
 
-def true_positive (loader, model, device='cuda'):
+def accuracy (loader, model, device='cuda'):
     model.eval()
 
-    num_correct = 0
-    num_samples = 0
+    true_positive = 0
+    true_negative = 0
+    all_labels = 0
 
     with torch.no_grad():
         for x, target in loader:
@@ -376,11 +377,31 @@ def true_positive (loader, model, device='cuda'):
             target = target.to(device=device)
 
             predictions = model(x)
-            num_correct += ((predictions * target) > .9).sum()
-            num_samples += target.sum()
+            true_negative += ((predictions * (1. - target)) < .1).sum()
+            true_positive += ((predictions * target) > .9).sum()
+            all_labels += target.numel()
+            print(true_positive, true_negative, all_labels)
 
     model.train()
-    return num_correct / (num_samples + 1.e-11)
+    return (true_positive + true_negative) / (all_labels + 1.e-11)
+
+def true_positive (loader, model, device='cuda'):
+    model.eval()
+
+    num_positive = 0
+    num_objects = 0
+
+    with torch.no_grad():
+        for x, target in loader:
+            x = x.to(device=device)
+            target = target.to(device=device)
+
+            predictions = model(x)
+            num_positive += ((predictions * target) > .9).sum()
+            num_objects += target.sum()
+
+    model.train()
+    return num_positive / (num_objects + 1.e-11)
 
 def true_positive_per_class  (loader, model, device='cuda'):
     model.eval()
@@ -408,8 +429,8 @@ def true_positive_per_class  (loader, model, device='cuda'):
 def true_negative (loader, model, device='cuda'):
     model.eval()
 
-    num_correct = 0
-    num_samples = 0
+    num_negative = 0
+    num_non_objects = 0
 
     with torch.no_grad():
         for x, target in loader:
@@ -419,11 +440,11 @@ def true_negative (loader, model, device='cuda'):
             predictions = model(x)
 
             negative_targets = (1. - target)
-            num_correct +=  ((negative_targets * predictions) < 0.1).sum()
-            num_samples += negative_targets.sum()
+            num_negative +=  ((negative_targets * predictions) < 0.1).sum()
+            num_non_objects += negative_targets.sum()
 
     model.train()
-    return num_correct / (num_samples + 1.e-11)
+    return num_negative / (num_non_objects + 1.e-11)
 
 def true_negative_per_class (loader, model, device='cuda'):
     model.eval()
@@ -453,8 +474,8 @@ def true_negative_per_class (loader, model, device='cuda'):
 def false_positive (loader, model, device='cuda'):
     model.eval()
 
-    num_correct = 0
-    num_samples = 0
+    num_positive = 0
+    num_non_objects = 0
 
     with torch.no_grad():
         for x, target in loader:
@@ -462,11 +483,11 @@ def false_positive (loader, model, device='cuda'):
             target = target.to(device=device)
 
             predictions = model(x)
-            num_correct += ((predictions * target) > .9).sum()
-            num_samples += (1. - target).sum()
+            num_positive += ((predictions * target) > .9).sum()
+            num_non_objects += (1. - target).sum()
 
     model.train()
-    return num_correct / (num_samples + 1.e-11)
+    return num_positive / (num_non_objects + 1.e-11)
 
 def false_positive_per_class (loader, model, device='cuda'):
     model.eval()

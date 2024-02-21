@@ -24,8 +24,8 @@ from utils import (
     false_positive,
     true_positive_per_class,
     true_negative_per_class,
-    false_positive_per_class
-
+    false_positive_per_class,
+    accuracy
 )
 from loss import YoloLoss
 from model_output import CLASSES_NUM
@@ -211,20 +211,20 @@ def train():
         "optimizer": optimizer.state_dict(),
     }
 
-    best_true_positive = 0.9
+    best_accuracy = 0.9
     reason = 'final'
 
     try:
         for epoch in range(EPOCHS):
 
-            current_true_positive = true_positive(test_loader, model, device=DEVICE)
+            epoch_accuracy = accuracy(test_loader, model, device=DEVICE)
 
             logger.info(f"EPOCH {epoch}/{EPOCHS}")
-            logger.info(f"Accuracy: {current_true_positive}")
+            logger.info(f"Accuracy: {epoch_accuracy}")
 
-            if current_true_positive > best_true_positive:
-                best_true_positive = current_true_positive
-                cp_filename = model_file_name(f'CNN-best-mAP{current_true_positive:.2f}')
+            if epoch_accuracy > best_accuracy:
+                best_accuracy = epoch_accuracy
+                cp_filename = model_file_name(f'CNN-best-mAP{epoch_accuracy:.2f}')
                 save_checkpoint(checkpoint,filename = cp_filename)
                 logger.info(f"Save model {cp_filename}")
             
@@ -235,7 +235,7 @@ def train():
         reason = "Interrupted"
         pass
 
-    cp_filename = model_file_name(f'CNN-{reason}-mAP{current_true_positive:.2f}')
+    cp_filename = model_file_name(f'CNN-{reason}-mAP{epoch_accuracy:.2f}')
     save_checkpoint(checkpoint, filename = cp_filename)
     logger.info(f"Save model {cp_filename}")
 
@@ -283,7 +283,7 @@ def run_show():
         class_predictions = (model(images))
 
         for idx in range(images.shape[0]):
-            name_list = [cls[i] for i in range(CLASSES_NUM)  if class_predictions[idx][i] > .5]
+            name_list = [cls[i] for i in range(CLASSES_NUM)  if class_predictions[idx][i] > .9]
             exp_list = [cls[i] for i in range(CLASSES_NUM)  if exp_label[idx][i] > .9]
             im = np.array(images[idx].permute(1,2,0).to("cpu"))
             # Create figure and axes
