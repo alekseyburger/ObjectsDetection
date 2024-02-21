@@ -148,7 +148,7 @@ class Yolov1(nn.Module):
             nn.Dropout(0.0),
             nn.LeakyReLU(0.1),
             nn.Linear(lsize, C, bias=False),
-            #nn.Sigmoid()
+            nn.Sigmoid()
         )
 
     def set_yolo_classifier (self, **kwargs):

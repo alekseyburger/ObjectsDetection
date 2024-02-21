@@ -369,7 +369,7 @@ def accuracy (loader, model, device='cuda'):
 
     true_positive = 0
     true_negative = 0
-    all_labels = 0
+    expected_positive, expected_negative = 0, 0
 
     with torch.no_grad():
         for x, target in loader:
@@ -377,13 +377,15 @@ def accuracy (loader, model, device='cuda'):
             target = target.to(device=device)
 
             predictions = model(x)
-            true_negative += ((predictions * (1. - target)) < .1).sum()
-            true_positive += ((predictions * target) > .9).sum()
-            all_labels += target.numel()
-            print(true_positive, true_negative, all_labels)
+            negative_target =  (1. - target) > 0.9
+            true_negative += ((predictions < .1)  * negative_target).sum()
+            expected_negative += negative_target.sum()
+            true_positive += ((predictions > .9) * target).sum()
+            expected_positive += (target > .9).sum()
 
     model.train()
-    return (true_positive + true_negative) / (all_labels + 1.e-11)
+
+    return true_positive/(expected_positive + 1.e-11), true_negative/(expected_negative + 1.e-11)
 
 def true_positive (loader, model, device='cuda'):
     model.eval()

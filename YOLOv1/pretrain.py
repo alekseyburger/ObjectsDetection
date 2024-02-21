@@ -211,16 +211,17 @@ def train():
         "optimizer": optimizer.state_dict(),
     }
 
-    best_accuracy = 0.9
+    best_accuracy = 0.90
     reason = 'final'
 
     try:
         for epoch in range(EPOCHS):
 
-            epoch_accuracy = accuracy(test_loader, model, device=DEVICE)
+            _accuracy = accuracy(test_loader, model, device=DEVICE)
+            epoch_accuracy = (_accuracy[0] + _accuracy[1]) / 2.
 
             logger.info(f"EPOCH {epoch}/{EPOCHS}")
-            logger.info(f"Accuracy: {epoch_accuracy}")
+            logger.info(f"Accuracy: positive {_accuracy[0]:5.3f} negative {_accuracy[1]:5.3f} med: {epoch_accuracy:5.3f}")
 
             if epoch_accuracy > best_accuracy:
                 best_accuracy = epoch_accuracy
