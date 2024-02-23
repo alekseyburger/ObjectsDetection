@@ -11,7 +11,7 @@ from torch import nn
 import torchvision.transforms.functional as FT
 from tqdm import tqdm
 from torch.utils.data import DataLoader
-from model import Yolov1
+from Yolov1 import Model
 from dataset import ClassificationDataset
 from utils import (
     mean_average_precision,
@@ -159,7 +159,7 @@ def train():
 
     logger.info(f"Start train: {train_data_path} test: {test_data_path} batch: {BATCH_SIZE} learning rate:{LEARNING_RATE}")
 
-    model = Yolov1(split_size=7,
+    model = Model(split_size=7,
                    num_boxes=2,
                    num_classes=20,
                    model_type="pretraining").to(DEVICE)
@@ -252,7 +252,7 @@ cls = ['aeroplane','bicycle','bird','boat',
 
 def run_show():
 
-    model = Yolov1(split_size=7,
+    model = Model(split_size=7,
                    num_boxes=2,
                    num_classes=20,
                    model_type="pretraining").to(DEVICE)
@@ -291,7 +291,7 @@ def run_show():
             fig, ax = plt.subplots(1)
             # Display the image
             ax.imshow(im)
-            plt.title(','.join(name_list)+':'+','.join(exp_list))
+            plt.title(','.join(name_list)+'('+','.join(exp_list)+')')
             plt.show()
 
 def report_per_class_accuracy(class_correct, class_samples):
@@ -303,7 +303,7 @@ def run_accuracy():
 
     logger.info(f"Start accuracy check: {train_data_path} test: {test_data_path}")
 
-    model = Yolov1(split_size=7,
+    model = Model(split_size=7,
                    num_boxes=2,
                    num_classes=20,
                    model_type="pretraining").to(DEVICE)

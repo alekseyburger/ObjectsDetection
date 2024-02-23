@@ -28,10 +28,6 @@ cnn_architecture_config = [
     (3, 1024, 1, 1),
     "M",
     [(1, 512, 1, 0), (3, 1024, 1, 1), 2],
-    # (3, 1024, 1, 1),
-    # (3, 1024, 2, 1),
-    # (3, 1024, 1, 1),
-    # (3, 1024, 1, 1),
 ]
 reduction_architecture_config = [
      (3, 1024, 1, 1),
@@ -52,13 +48,13 @@ class CNNBlock(nn.Module):
         return self.leakyrelu(self.batchnorm(self.conv(x)))
 
 
-class Yolov1(nn.Module):
+class Model(nn.Module):
     """
     Model input (batch, in_channels=3, 448,448)
     """
 
     def __init__(self, in_channels=3, model_type = "training", **kwargs):
-        super(Yolov1, self).__init__()
+        super(Model, self).__init__()
 
         self.in_channels = in_channels
         # it returns output chennals number in self.in_channels
@@ -151,19 +147,20 @@ class Yolov1(nn.Module):
             nn.Sigmoid()
         )
 
-    def set_yolo_classifier (self, **kwargs):
+    def classifier_to_detection (self, **kwargs):
         self.reduction = self._create_conv_layers(reduction_architecture_config, 1024)
         self.fcs = self._create_fcs(1024, **kwargs)
 
-    def cnn_set_grad (self, is_grad=True):
+    def cnn_freeze (self, is_freez=True):
+        requires_grad = not is_freez
         for p in self.cnn.parameters():
-            p.requires_grad = is_grad
+            p.requires_grad = requires_grad
 
 
 if __name__ == "__main__":
     # test model output
     x = torch.randn((8, 3, 448,448))
-    pretrain_model = Yolov1(split_size=7, num_boxes=2, num_classes=20, model_type="pretraining")
+    pretrain_model = Model(split_size=7, num_boxes=2, num_classes=20, model_type="pretraining")
     print(pretrain_model(x).shape)
-    train_model = Yolov1(split_size=7, num_boxes=2, num_classes=20, model_type="training")
+    train_model = Model(split_size=7, num_boxes=2, num_classes=20, model_type="training")
     print(train_model(x).shape)

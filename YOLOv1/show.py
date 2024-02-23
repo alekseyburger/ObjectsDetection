@@ -11,7 +11,7 @@ import torch.optim as optim
 import torchvision.transforms.functional as FT
 from tqdm import tqdm
 from torch.utils.data import DataLoader
-from model import Yolov1
+from Yolov1 import Model
 from dataset import VOCDataset
 from utils import (
     non_max_suppression,
@@ -106,7 +106,7 @@ transform = Compose([transforms.Resize((448, 448)), transforms.ToTensor(),])
 
 def main():
 
-    model = Yolov1(split_size=7, num_boxes=2, num_classes=20).to(DEVICE)
+    model = Model(split_size=7, num_boxes=2, num_classes=20).to(DEVICE)
     optimizer = optim.Adam(
         model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY
     )

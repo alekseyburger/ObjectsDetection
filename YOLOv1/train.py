@@ -10,7 +10,7 @@ import torch.optim as optim
 import torchvision.transforms.functional as FT
 from tqdm import tqdm
 from torch.utils.data import DataLoader
-from model import Yolov1
+from Yolov1 import Model
 from dataset import VOCDataset
 from utils import (
     mean_average_precision,
@@ -160,7 +160,7 @@ def main():
     logger.info(f"Start train: {train_data_path} test: {test_data_path} batch: {BATCH_SIZE} learning rate {LEARNING_RATE}")
 
     if feature_extraction_model :
-        model = Yolov1(split_size=7,
+        model = Model(split_size=7,
                     num_boxes=2,
                     num_classes=20,
                     model_type="pretraining").to("cpu")
@@ -172,18 +172,18 @@ def main():
                             optimizer)
         logger.info(f"Load model {feature_extraction_model}")
         logger.info(f'Original classifier {model.fcs}')
-        model.set_yolo_classifier(split_size=7,
+        model.classifier_to_detection(split_size=7,
                     num_boxes=2,
                     num_classes=20)
         model.fcs.train()
         logger.info(f'Target classifier {model.fcs}')
 
-        model.cnn_set_grad(False)
+        model.cnn_freeze(True)
         # model.cnn.eval()
         optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
         model.to(DEVICE)
     else:
-        model = Yolov1(split_size=7,
+        model = Model(split_size=7,
                     num_boxes=2,
                     num_classes=20).to(DEVICE)
         optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)

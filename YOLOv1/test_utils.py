@@ -8,7 +8,7 @@ import torch
 # import torchvision.transforms.functional as FT
 # from tqdm import tqdm
 # from torch.utils.data import DataLoader
-# from model import Yolov1
+# from Yolov1 import Model
 # from dataset import VOCDataset
 from utils import (
     non_max_suppression,
