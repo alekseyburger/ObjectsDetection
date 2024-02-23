@@ -40,6 +40,7 @@ for handler in logger.handlers:
 parser = argparse.ArgumentParser(prog='test',
             description='model tester')
 parser.add_argument('-t', '--test-data', type=pathlib.Path, required = True)
+parser.add_argument('-d', '--data-dir', type=pathlib.Path, required = False)
 parser.add_argument('-m', '--model', type=pathlib.Path, required = True)
 parser.add_argument('-b', '--batch', default=32, help='batch size')
 parser.add_argument('--no-cuda',
@@ -84,8 +85,16 @@ WEIGHT_DECAY = 0
 NUM_WORKERS = 2
 PIN_MEMORY = True
 
-IMG_DIR = "data/images"
-LABEL_DIR = "data/labels"
+data_dir_path = args.data_dir
+if data_dir_path:
+    if not os.path.exists(data_dir_path):
+        print(f"Data path is not exist {data_dir_path}")
+        sys.exit(1)
+else:
+    data_dir_path = "data"
+
+IMG_DIR = os.path.join(data_dir_path, "images")
+LABEL_DIR = os.path.join(data_dir_path, "labels")
 
 logger.info(f"test torch device is {DEVICE}")
 
