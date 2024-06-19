@@ -66,7 +66,7 @@ class Model(nn.Module):
             self.fcs = self._create_pretraining_fcs(self.in_channels, **kwargs)
         else:
             self.reduction = self._create_conv_layers(reduction_architecture_config, self.in_channels)
-            self.fcs = self._create_fcs(self.in_channels, **kwargs)
+            self.fcs = self._create_main_fcs(self.in_channels, **kwargs)
 
     def forward(self, x):
         x = self.cnn(x)             #torch.Size([batch, 1024, 14, 14])
@@ -117,7 +117,7 @@ class Model(nn.Module):
             self.in_channels = in_channels
         return nn.Sequential(*layers)
 
-    def _create_fcs(self, in_channals, split_size, num_boxes, num_classes):
+    def _create_main_fcs(self, in_channals, split_size, num_boxes, num_classes):
         S, B, C = split_size, num_boxes, num_classes
 
         # In original paper this should be
@@ -125,12 +125,13 @@ class Model(nn.Module):
         # nn.LeakyReLU(0.1),
         # nn.Linear(4096, S*S*(B*5+C))
 
+        lsize = C * 4096//128
         return nn.Sequential(
             nn.Flatten(),
-            nn.Linear(in_channals * S * S, 4096),
+            nn.Linear(in_channals * S * S, lsize),
             nn.Dropout(0.0),
             nn.LeakyReLU(0.1),
-            nn.Linear(4096, S * S * (C + B * 5)),
+            nn.Linear(lsize, S * S * (C + B * 5)),
         )
 
     def _create_pretraining_fcs(self, in_channals, split_size, num_boxes, num_classes):
@@ -141,7 +142,7 @@ class Model(nn.Module):
         return nn.Sequential(
             nn.Flatten(),
             nn.Linear(in_features = in_channals * 4 * S * S, out_features=lsize, bias=True),
-            nn.Dropout(0.0),
+            nn.Dropout(0.01),
             nn.LeakyReLU(0.1),
             nn.Linear(lsize, C, bias=False),
             nn.Sigmoid()
@@ -149,7 +150,7 @@ class Model(nn.Module):
 
     def classifier_to_detection (self, **kwargs):
         self.reduction = self._create_conv_layers(reduction_architecture_config, 1024)
-        self.fcs = self._create_fcs(1024, **kwargs)
+        self.fcs = self._create_main_fcs(1024, **kwargs)
 
     def cnn_freeze (self, is_freez=True):
         requires_grad = not is_freez
