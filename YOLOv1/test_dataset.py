@@ -27,6 +27,7 @@ PIN_MEMORY = True
 # LOAD_MODEL_FILE = "overfit.pth.tar"
 IMG_DIR = "data/images"
 LABEL_DIR = "data/labels"
+FILE_CSV = "data/1examples.csv"
 
 
 class Compose(object):
@@ -56,7 +57,7 @@ class TestDataset(unittest.TestCase):
         transform = Compose([transforms.Resize((448, 448)), transforms.ToTensor(),])
         
         self.train_dataset = VOCDataset(
-            "data/1examples.csv",
+            FILE_CSV,
             transform=transform,
             img_dir=IMG_DIR,
             label_dir=LABEL_DIR,

@@ -33,7 +33,7 @@ from model_output import box_center, box_h_w
 import pdb
 
 """
-python -m unittest test_loss.py
+python -m unittest test_utils.py
 """
 
 PRED0=CLASSES_NUM
