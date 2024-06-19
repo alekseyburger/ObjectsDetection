@@ -155,6 +155,7 @@ def train_fn(train_loader, model, optimizer, loss_fn):
 #                 output[name] = nested_children(child)
 #     return output
 
+MEAN_AVG_TRESHOULD = 0.8
 def main():
 
     logger.info(f"Start train: {train_data_path} test: {test_data_path} batch: {BATCH_SIZE} learning rate {LEARNING_RATE}")
@@ -235,8 +236,12 @@ def main():
         "optimizer": optimizer.state_dict(),
     }
 
-    best_mean_avg = 0.8
+    best_mean_avg = MEAN_AVG_TRESHOULD
     reason = 'final'
+
+    regular_save = 0
+    if EPOCHS > 100:
+        regular_save = EPOCHS // 10
 
     try:
         for epoch in range(EPOCHS):
@@ -257,11 +262,20 @@ def main():
                 logger.info(f"EPOCH {epoch}/{EPOCHS}")
                 logger.info(f"Train mAP: {mean_avg_prec}")
 
+                save_is_req = False
                 if mean_avg_prec > best_mean_avg:
+                    # it looks be the best result
                     best_mean_avg = mean_avg_prec
+                    save_is_req = True
+                elif mean_avg_prec == best_mean_avg and regular_save and epoch and (epoch%regular_save == 0) :
+                    # mean_avg_prec is low, but regular save is needed
+                    save_is_req = True
+
+                if save_is_req:
                     cp_filename = model_file_name(f'best-mAP{mean_avg_prec:.2f}')
                     save_checkpoint(checkpoint,filename = cp_filename)
                     logger.info(f"Save model {cp_filename}")
+                    save_is_req = False
 
             train_fn(train_loader, model, optimizer, loss_fn)
 
