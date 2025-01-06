@@ -17,7 +17,7 @@ from model_output import soutput_box_probability, soutput_box
 python -m unittest test_dataset.py
 """
 # LEARNING_RATE = 2e-5
-# DEVICE = "cuda" if torch.cuda.is_available else "cpu"
+DEVICE = "cuda" if torch.cuda.is_available else "cpu"
 BATCH_SIZE = 1 # 64 in original paper but I don't have that much vram, grad accum?
 # WEIGHT_DECAY = 0
 # EPOCHS = 1000
@@ -50,8 +50,7 @@ import pdb
 class TestDataset(unittest.TestCase):
 
     def setUp(self) -> None:
-        self.DEVICE = "cpu"
-        #if torch.cuda.is_available : self.DEVICE = "cuda"
+        self.DEVICE = DEVICE
         print(f"Device is {self.DEVICE}")
 
         transform = Compose([transforms.Resize((448, 448)), transforms.ToTensor(),])
