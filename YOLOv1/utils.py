@@ -374,6 +374,7 @@ def accuracy (loader, model, device='cuda'):
     with torch.no_grad():
         for x, target in loader:
             x = x.to(device=device)
+            #print(x.size())
             target = target.to(device=device)
 
             predictions = model(x)

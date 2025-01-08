@@ -29,6 +29,7 @@ from utils import (
 )
 from loss import YoloLoss
 from model_output import CLASSES_NUM
+from model_output import IMAGE_HEIGHT, IMAGE_WIDTH
 
 import os, sys
 
@@ -62,12 +63,12 @@ parser.add_argument('--show',
                     action='store_const',
                     const=True,
                     default=False,
-                    help='Show images with classes')
+                    help='run program for Show images with classes')
 parser.add_argument('--accuracy',
                     action='store_const',
                     const=True,
                     default=False,
-                    help='calculate true positive/negative accuracy')
+                    help='run program for calculate true positive/negative accuracy per class')
 
 args = parser.parse_args()
 
@@ -124,6 +125,12 @@ LABEL_DIR = os.path.join(data_dir_path, "labels")
 
 logger.info(f"pretrain: torch device is {DEVICE}")
 
+cls = ['aeroplane','bicycle','bird','boat',
+        'bottle','bus','car','cat',
+        'chair','cow','diningtable','dog',
+        'horse','motorbike','person','pottedplant',
+        'sheep','sofa','train','tvmonitor']
+
 class Compose(object):
     def __init__(self, transforms):
         self.transforms = transforms
@@ -135,7 +142,7 @@ class Compose(object):
         return img, bboxes
 
 
-transform = Compose([transforms.Resize((448, 448)), transforms.ToTensor(),])
+transform = Compose([transforms.Resize((IMAGE_HEIGHT, IMAGE_WIDTH)), transforms.ToTensor(),])
 
 def pretarin_fn(train_loader, model, optimizer, loss_fn):
     loop = tqdm(train_loader, leave=True)
@@ -157,11 +164,11 @@ def pretarin_fn(train_loader, model, optimizer, loss_fn):
 
 def train():
 
-    logger.info(f"Start train: {train_data_path} test: {test_data_path} batch: {BATCH_SIZE} learning rate:{LEARNING_RATE}")
+    logger.info(f"Start with image {IMAGE_HEIGHT}x{IMAGE_WIDTH} train: {train_data_path} test: {test_data_path} batch: {BATCH_SIZE} learning rate:{LEARNING_RATE}")
 
-    model = Model(split_size=7,
+    model = Model(num_cells=7,
                    num_boxes=2,
-                   num_classes=20,
+                   num_classes=len(cls),
                    model_type="pretraining").to(DEVICE)
     
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
@@ -172,6 +179,8 @@ def train():
         optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
         model.train()
         logger.info(f"Load model {model_path}")
+    logger.info(f'CNN {model.cnn}')
+    logger.info(f'Reduction {model.reduction}')
     logger.info(f'Classifier {model.fcs}')
 
     train_dataset = ClassificationDataset(
@@ -225,7 +234,7 @@ def train():
 
             if epoch_accuracy > best_accuracy:
                 best_accuracy = epoch_accuracy
-                cp_filename = model_file_name(f'CNN-best-mAP{epoch_accuracy:.2f}')
+                cp_filename = model_file_name(f'CNN-best-{IMAGE_HEIGHT}x{IMAGE_WIDTH}-mAP{epoch_accuracy:.2f}')
                 save_checkpoint(checkpoint,filename = cp_filename)
                 logger.info(f"Save model {cp_filename}")
             
@@ -236,7 +245,7 @@ def train():
         reason = "Interrupted"
         pass
 
-    cp_filename = model_file_name(f'CNN-{reason}-mAP{epoch_accuracy:.2f}')
+    cp_filename = model_file_name(f'CNN-{reason}-{IMAGE_HEIGHT}x{IMAGE_WIDTH}-mAP{epoch_accuracy:.2f}')
     save_checkpoint(checkpoint, filename = cp_filename)
     logger.info(f"Save model {cp_filename}")
 
@@ -244,17 +253,11 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import numpy as np
 
-cls = ['aeroplane','bicycle','bird','boat',
-        'bottle','bus','car','cat',
-        'chair','cow','diningtable','dog',
-        'horse','motorbike','person','pottedplant',
-        'sheep','sofa','train','tvmonitor']
-
 def run_show():
 
-    model = Model(split_size=7,
+    model = Model(num_cells=7,
                    num_boxes=2,
-                   num_classes=20,
+                   num_classes=len(cls),
                    model_type="pretraining").to(DEVICE)
     optimizer = optim.Adam(
         model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
@@ -301,11 +304,11 @@ def report_per_class_accuracy(class_correct, class_samples):
    
 def run_accuracy():
 
-    logger.info(f"Start accuracy check: {train_data_path} test: {test_data_path}")
+    logger.info(f"Start accuracy check with image {IMAGE_HEIGHT}x{IMAGE_WIDTH} train: {train_data_path} test: {test_data_path}")
 
-    model = Model(split_size=7,
+    model = Model(num_cells=7,
                    num_boxes=2,
-                   num_classes=20,
+                   num_classes=len(cls),
                    model_type="pretraining").to(DEVICE)
     optimizer = optim.Adam(
         model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)

@@ -7,6 +7,7 @@ from dataset import VOCDataset
 import torchvision.transforms as transforms
 
 from model_output import CELLS_PER_DIM, CLASSES_NUM, BOXES_NUM, BOX_PROPERTIES_LEN, BOXES_AREA_LEN
+from model_output import IMAGE_HEIGHT, IMAGE_WIDTH
 from model_output import COORD_LOSS_WEIGHT
 from model_output import moutput_box_center, moutput_box_h_w, moutput_box
 from model_output import box_center, box_h_w
@@ -53,8 +54,9 @@ class TestDataset(unittest.TestCase):
         self.DEVICE = DEVICE
         print(f"Device is {self.DEVICE}")
 
-        transform = Compose([transforms.Resize((448, 448)), transforms.ToTensor(),])
+        transform = Compose([transforms.Resize((IMAGE_HEIGHT, IMAGE_WIDTH)), transforms.ToTensor(),])
         
+        # load dataset from specific single image file
         self.train_dataset = VOCDataset(
             FILE_CSV,
             transform=transform,

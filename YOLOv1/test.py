@@ -18,7 +18,7 @@ from utils import (
     load_checkpoint,
 )
 import pdb
-
+from model_output import IMAGE_HEIGHT, IMAGE_WIDTH
 import os, sys
 import argparse
 import pathlib
@@ -109,11 +109,11 @@ class Compose(object):
         return img, bboxes
 
 
-transform = Compose([transforms.Resize((448, 448)), transforms.ToTensor(),])
+transform = Compose([transforms.Resize((IMAGE_HEIGHT, IMAGE_WIDTH)), transforms.ToTensor(),])
 
 def main():
 
-    model = Model(split_size=7, num_boxes=2, num_classes=20).to(DEVICE)
+    model = Model(num_cells=7, num_boxes=2, num_classes=20).to(DEVICE)
     optimizer = optim.Adam(
         model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY
     )

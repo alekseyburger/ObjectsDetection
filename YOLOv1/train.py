@@ -19,6 +19,7 @@ from utils import (
     save_checkpoint,
     model_file_name
 )
+from model_output import IMAGE_HEIGHT, IMAGE_WIDTH
 from loss import YoloLoss
 
 import os, sys
@@ -120,7 +121,7 @@ class Compose(object):
         return img, bboxes
 
 
-transform = Compose([transforms.Resize((448, 448)), transforms.ToTensor(),])
+transform = Compose([transforms.Resize((IMAGE_HEIGHT, IMAGE_WIDTH)), transforms.ToTensor(),])
 
 def train_fn(train_loader, model, optimizer, loss_fn):
     loop = tqdm(train_loader, leave=True)
@@ -158,10 +159,10 @@ def train_fn(train_loader, model, optimizer, loss_fn):
 MEAN_AVG_TRESHOULD = 0.8
 def main():
 
-    logger.info(f"Start train: {train_data_path} test: {test_data_path} batch: {BATCH_SIZE} learning rate {LEARNING_RATE}")
+    logger.info(f"Start with image {IMAGE_HEIGHT}x{IMAGE_WIDTH} train: {train_data_path} test: {test_data_path} batch: {BATCH_SIZE} learning rate {LEARNING_RATE}")
 
     if feature_extraction_model :
-        model = Model(split_size=7,
+        model = Model(num_cells=7,
                     num_boxes=2,
                     num_classes=20,
                     model_type="pretraining").to("cpu")
@@ -173,7 +174,7 @@ def main():
                             optimizer)
         logger.info(f"Load model {feature_extraction_model}")
         logger.info(f'Original classifier {model.fcs}')
-        model.classifier_to_detection(split_size=7,
+        model.classifier_to_detection(num_cells=7,
                     num_boxes=2,
                     num_classes=20)
         model.fcs.train()
@@ -184,7 +185,7 @@ def main():
         optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
         model.to(DEVICE)
     else:
-        model = Model(split_size=7,
+        model = Model(num_cells=7,
                     num_boxes=2,
                     num_classes=20).to(DEVICE)
         optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
@@ -272,7 +273,7 @@ def main():
                     save_is_req = True
 
                 if save_is_req:
-                    cp_filename = model_file_name(f'best-mAP{mean_avg_prec:.2f}')
+                    cp_filename = model_file_name(f'best-{IMAGE_HEIGHT}x{IMAGE_WIDTH}-mAP{mean_avg_prec:.2f}')
                     save_checkpoint(checkpoint,filename = cp_filename)
                     logger.info(f"Save model {cp_filename}")
                     save_is_req = False
@@ -284,7 +285,7 @@ def main():
         reason = "Interrupted"
         pass
 
-    cp_filename = model_file_name(f'{reason}-mAP{mean_avg_prec:.2f}')
+    cp_filename = model_file_name(f'{reason}-{IMAGE_HEIGHT}x{IMAGE_WIDTH}-mAP{mean_avg_prec:.2f}')
     save_checkpoint(checkpoint, filename = cp_filename)
     logger.info(f"Save model {cp_filename}")
 

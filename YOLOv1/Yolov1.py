@@ -14,7 +14,7 @@ List is structured by tuples and lastly int with number of repeats
 """
 
 cnn_architecture_config = [
-    (7, 64, 2, 3),
+    (7, 64, 2, 3),    # CNN kernel_size, out_channels, stride, padding
     "M",
     (3, 192, 1, 1),
     "M",
@@ -50,7 +50,7 @@ class CNNBlock(nn.Module):
 
 class Model(nn.Module):
     """
-    Model input (batch, in_channels=3, 448,448)
+    Model input (batch, in_channels=3, 448,448) ABURGER: fix the size
     """
 
     def __init__(self, in_channels=3, model_type = "training", **kwargs):
@@ -61,12 +61,13 @@ class Model(nn.Module):
         self.cnn = self._create_conv_layers(cnn_architecture_config, self.in_channels)
         self.reduction = None
         self.is_pretraining = model_type == "pretraining"
+        #print(f"CNN input channels {self.in_channels} output channels {self.conv_channels}")
 
         if self.is_pretraining:
-            self.fcs = self._create_pretraining_fcs(self.in_channels, **kwargs)
+            self.fcs = self._create_pretraining_fcs(self.conv_channels, **kwargs)
         else:
-            self.reduction = self._create_conv_layers(reduction_architecture_config, self.in_channels)
-            self.fcs = self._create_main_fcs(self.in_channels, **kwargs)
+            self.reduction = self._create_conv_layers(reduction_architecture_config, self.conv_channels)
+            self.fcs = self._create_main_fcs(self.conv_channels, **kwargs)
 
     def forward(self, x):
         x = self.cnn(x)             #torch.Size([batch, 1024, 14, 14])
@@ -114,37 +115,63 @@ class Model(nn.Module):
                         )
                     ]
                     in_channels = conv2[1]
-            self.in_channels = in_channels
+
+        self.conv_channels = in_channels
         return nn.Sequential(*layers)
 
-    def _create_main_fcs(self, in_channals, split_size, num_boxes, num_classes):
-        S, B, C = split_size, num_boxes, num_classes
+    def _create_main_fcs(self, in_channals, num_cells, num_boxes, num_classes):
 
         # In original paper this should be
-        # nn.Linear(1024*S*S, 4096),
+        # nn.Linear(1024*num_cells*num_cells, 4096),
         # nn.LeakyReLU(0.1),
-        # nn.Linear(4096, S*S*(B*5+C))
+        # nn.Linear(4096, num_cells*num_cells*(num_boxes*5+num_classes))
 
-        lsize = C * 4096//128
+        lsize = num_classes * 4096//128   # Fit model to available GPU resources
         return nn.Sequential(
             nn.Flatten(),
-            nn.Linear(in_channals * S * S, lsize),
+            nn.Linear(in_channals * num_cells * num_cells, lsize),
+            # nn.Linear(in_channals * 2 * 2, lsize), # 112x112
             nn.Dropout(0.0),
             nn.LeakyReLU(0.1),
-            nn.Linear(lsize, S * S * (C + B * 5)),
+            nn.Linear(lsize, num_cells * num_cells * (num_classes + num_boxes * 5)),
         )
 
-    def _create_pretraining_fcs(self, in_channals, split_size, num_boxes, num_classes):
-        S, B, C = split_size, num_boxes, num_classes
+    def _create_pretraining_fcs(self, in_channals, num_cells, num_boxes, num_classes):
+        '''
+        Creating classification layers for the pre-trained model runing as a classifier
+        The output is an array of probabilities for each class.
+        '''
+
+        lsize = num_classes * 4096//32   # Fit model to available GPU resources
+        return nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(in_features = in_channals * 4 * num_cells * num_cells, out_features=lsize, bias=True),
+            # nn.Linear(in_features = 1024 *3 *3,  out_features=lsize, bias=True),    # 112x112
+            nn.Dropout(0.01),
+            nn.LeakyReLU(0.1),
+            nn.Linear(lsize, num_classes, bias=False),
+            nn.Sigmoid()
+        )
+
+    def _create_pretraining_fcs_3linear(self, in_channals, num_cells, num_boxes, num_classes):
+        '''
+        Creating classification layers for the pre-trained model runing as a classifier
+        The output is an array of probabilities for each class.
+        '''
+
         # Fit model to available GPU resources
-        lsize = C * 4096//64
+        lsize = num_classes * 32
 
         return nn.Sequential(
             nn.Flatten(),
-            nn.Linear(in_features = in_channals * 4 * S * S, out_features=lsize, bias=True),
-            nn.Dropout(0.01),
-            nn.LeakyReLU(0.1),
-            nn.Linear(lsize, C, bias=False),
+            # nn.Linear(in_features = in_channals * 4 * num_cells * num_cells, out_features=lsize, bias=True),
+            nn.Linear(in_features = in_channals *3 *3,  out_features=lsize, bias=True),
+            nn.Dropout(0.1),
+            nn.LeakyReLU(0.01),
+            nn.Linear(in_features = lsize,  out_features=lsize, bias=True),
+            nn.Dropout(0.1),
+            nn.LeakyReLU(0.01),
+            nn.Linear(lsize, num_classes, bias=False),
             nn.Sigmoid()
         )
 
@@ -161,7 +188,7 @@ class Model(nn.Module):
 if __name__ == "__main__":
     # test model output
     x = torch.randn((8, 3, 448,448))
-    pretrain_model = Model(split_size=7, num_boxes=2, num_classes=20, model_type="pretraining")
+    pretrain_model = Model(num_cells=7, num_boxes=2, num_classes=20, model_type="pretraining")
     print(pretrain_model(x).shape)
-    train_model = Model(split_size=7, num_boxes=2, num_classes=20, model_type="training")
+    train_model = Model(num_cells=7, num_boxes=2, num_classes=20, model_type="training")
     print(train_model(x).shape)
