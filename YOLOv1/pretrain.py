@@ -28,7 +28,7 @@ from utils import (
     accuracy
 )
 from loss import YoloLoss
-from model_output import CLASSES_NUM
+from model_output import CLASSES_NUM, BOXES_NUM, CELLS_PER_DIM
 from model_output import IMAGE_HEIGHT, IMAGE_WIDTH
 
 import os, sys
@@ -169,7 +169,8 @@ def train():
     model = Model(num_cells=7,
                    num_boxes=2,
                    num_classes=len(cls),
-                   model_type="pretraining").to(DEVICE)
+                   model_type="pretraining",
+                   image_size=IMAGE_HEIGHT).to(DEVICE)
     
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
     
@@ -258,7 +259,8 @@ def run_show():
     model = Model(num_cells=7,
                    num_boxes=2,
                    num_classes=len(cls),
-                   model_type="pretraining").to(DEVICE)
+                   model_type="pretraining",
+                   image_size=IMAGE_HEIGHT).to(DEVICE)
     optimizer = optim.Adam(
         model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
  
@@ -309,7 +311,8 @@ def run_accuracy():
     model = Model(num_cells=7,
                    num_boxes=2,
                    num_classes=len(cls),
-                   model_type="pretraining").to(DEVICE)
+                   model_type="pretraining",
+                   image_size=IMAGE_HEIGHT).to(DEVICE)
     optimizer = optim.Adam(
         model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
 

@@ -5,6 +5,7 @@ with slight modification with added BatchNorm.
 
 import torch
 import torch.nn as nn
+from model_output import CELLS_PER_DIM
 
 """ 
 Information about architecture config:
@@ -23,7 +24,7 @@ cnn_architecture_config = [
     (1, 256, 1, 0),
     (3, 512, 1, 1),
     "M",
-    [(1, 256, 1, 0), (3, 512, 1, 1), 4],
+    [(1, 256, 1, 0), (3, 512, 1, 1), 4], # Parallel CNN Blocks
     (1, 512, 1, 0),
     (3, 1024, 1, 1),
     "M",
@@ -53,21 +54,23 @@ class Model(nn.Module):
     Model input (batch, in_channels=3, 448,448) ABURGER: fix the size
     """
 
-    def __init__(self, in_channels=3, model_type = "training", **kwargs):
+    def __init__(self, num_cells, num_boxes, num_classes, image_size, in_channels=3, model_type = "training"):
         super(Model, self).__init__()
 
         self.in_channels = in_channels
         # it returns output chennals number in self.in_channels
-        self.cnn = self._create_conv_layers(cnn_architecture_config, self.in_channels)
+        self.cnn = self._create_conv_layers(cnn_architecture_config, self.in_channels, image_size)
         self.reduction = None
         self.is_pretraining = model_type == "pretraining"
         #print(f"CNN input channels {self.in_channels} output channels {self.conv_channels}")
 
         if self.is_pretraining:
-            self.fcs = self._create_pretraining_fcs(self.conv_channels, **kwargs)
+            self.fcs = self._create_pretraining_fcs(self.conv_channels * self.conv_size * self.conv_size,
+                                        num_cells, num_boxes, num_classes)
         else:
-            self.reduction = self._create_conv_layers(reduction_architecture_config, self.conv_channels)
-            self.fcs = self._create_main_fcs(self.conv_channels, **kwargs)
+            self.reduction = self._create_reduction_layers(reduction_architecture_config, self.conv_channels, self.conv_size)
+            self.fcs = self._create_main_fcs(self.reduction_channels * self.reduction_size * self.reduction_size,
+                                        num_cells, num_boxes, num_classes)
 
     def forward(self, x):
         x = self.cnn(x)             #torch.Size([batch, 1024, 14, 14])
@@ -75,22 +78,25 @@ class Model(nn.Module):
             x = self.reduction(x)   #torch.Size([batch, 1024, 7, 7])
         return self.fcs(x)
 
-    def _create_conv_layers(self, architecture, in_channels):
-        layers = []
+    def _create_conv_layers(self, architecture, in_channels, image_size):
+        all_layers = []
 
         for x in architecture:
-            if type(x) == tuple:
+            layers = []
+            if type(x) == tuple:  # Simple CNN Block
                 layers += [
                     CNNBlock(
                         in_channels, x[1], kernel_size=x[0], stride=x[2], padding=x[3],
                     )
                 ]
                 in_channels = x[1]
+                image_size //= x[2]
 
-            elif type(x) == str:
+            elif type(x) == str:  # Max Pool
                 layers += [nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2))]
+                image_size //= 2
 
-            elif type(x) == list:
+            elif type(x) == list: # Parallel CNN Blocks
                 conv1 = x[0]
                 conv2 = x[1]
                 num_repeats = x[2]
@@ -115,9 +121,37 @@ class Model(nn.Module):
                         )
                     ]
                     in_channels = conv2[1]
+                    image_size //= conv1[2]
 
-        self.conv_channels = in_channels
-        return nn.Sequential(*layers)
+            if image_size < CELLS_PER_DIM:
+                print("Ignore layer that causes small output size")
+                break
+            all_layers.extend(layers)
+            self.conv_channels = in_channels
+            self.conv_size = image_size
+        
+        return nn.Sequential(*all_layers)
+
+    def _create_reduction_layers(self, architecture, in_channels, image_size):
+        all_layers = []
+        for x in architecture:
+            layers = []
+            if type(x) == tuple:
+                layers += [
+                    CNNBlock(
+                        in_channels, in_channels, kernel_size=x[0], stride=x[2], padding=x[3],
+                    )
+                ]
+                image_size //= x[2]
+
+            if image_size < CELLS_PER_DIM:
+                print("Ignore layer that causes small output size")
+                continue        
+            all_layers.extend(layers)
+            self.reduction_channels = in_channels
+            self.reduction_size = image_size
+
+        return nn.Sequential(*all_layers)
 
     def _create_main_fcs(self, in_channals, num_cells, num_boxes, num_classes):
 
@@ -126,11 +160,10 @@ class Model(nn.Module):
         # nn.LeakyReLU(0.1),
         # nn.Linear(4096, num_cells*num_cells*(num_boxes*5+num_classes))
 
-        lsize = num_classes * 4096//128   # Fit model to available GPU resources
+        lsize = num_classes * 512 # Fit model to available GPU resources
         return nn.Sequential(
             nn.Flatten(),
-            nn.Linear(in_channals * num_cells * num_cells, lsize),
-            # nn.Linear(in_channals * 2 * 2, lsize), # 112x112
+            nn.Linear(in_channals, lsize),
             nn.Dropout(0.0),
             nn.LeakyReLU(0.1),
             nn.Linear(lsize, num_cells * num_cells * (num_classes + num_boxes * 5)),
@@ -142,11 +175,10 @@ class Model(nn.Module):
         The output is an array of probabilities for each class.
         '''
 
-        lsize = num_classes * 4096//32   # Fit model to available GPU resources
+        lsize = 4096   # Fit model to available GPU resources
         return nn.Sequential(
             nn.Flatten(),
-            nn.Linear(in_features = in_channals * 4 * num_cells * num_cells, out_features=lsize, bias=True),
-            # nn.Linear(in_features = 1024 *3 *3,  out_features=lsize, bias=True),    # 112x112
+            nn.Linear(in_features = in_channals, out_features=lsize, bias=True),
             nn.Dropout(0.01),
             nn.LeakyReLU(0.1),
             nn.Linear(lsize, num_classes, bias=False),
@@ -160,7 +192,7 @@ class Model(nn.Module):
         '''
 
         # Fit model to available GPU resources
-        lsize = num_classes * 32
+        lsize = 4096
 
         return nn.Sequential(
             nn.Flatten(),
@@ -176,8 +208,9 @@ class Model(nn.Module):
         )
 
     def classifier_to_detection (self, **kwargs):
-        self.reduction = self._create_conv_layers(reduction_architecture_config, 1024)
-        self.fcs = self._create_main_fcs(1024, **kwargs)
+        self.reduction = self._create_reduction_layers(reduction_architecture_config,
+                                    self.conv_channels, self.conv_size)
+        self.fcs = self._create_main_fcs(self.reduction_channels * self.reduction_size * self.reduction_size, **kwargs)
 
     def cnn_freeze (self, is_freez=True):
         requires_grad = not is_freez
@@ -188,7 +221,7 @@ class Model(nn.Module):
 if __name__ == "__main__":
     # test model output
     x = torch.randn((8, 3, 448,448))
-    pretrain_model = Model(num_cells=7, num_boxes=2, num_classes=20, model_type="pretraining")
+    pretrain_model = Model(num_cells=7, num_boxes=2, num_classes=20, model_type="pretraining", image_size=448)
     print(pretrain_model(x).shape)
-    train_model = Model(num_cells=7, num_boxes=2, num_classes=20, model_type="training")
+    train_model = Model(num_cells=7, num_boxes=2, num_classes=20, model_type="training",image_size=448)
     print(train_model(x).shape)

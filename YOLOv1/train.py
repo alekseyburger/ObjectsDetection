@@ -19,6 +19,7 @@ from utils import (
     save_checkpoint,
     model_file_name
 )
+from model_output import CLASSES_NUM, BOXES_NUM, CELLS_PER_DIM
 from model_output import IMAGE_HEIGHT, IMAGE_WIDTH
 from loss import YoloLoss
 
@@ -162,10 +163,11 @@ def main():
     logger.info(f"Start with image {IMAGE_HEIGHT}x{IMAGE_WIDTH} train: {train_data_path} test: {test_data_path} batch: {BATCH_SIZE} learning rate {LEARNING_RATE}")
 
     if feature_extraction_model :
-        model = Model(num_cells=7,
-                    num_boxes=2,
-                    num_classes=20,
-                    model_type="pretraining").to("cpu")
+        model = Model(num_cells=CELLS_PER_DIM,
+                    num_boxes=BOXES_NUM,
+                    num_classes=CLASSES_NUM,
+                    model_type="pretraining",
+                    image_size=IMAGE_HEIGHT).to("cpu")
         optimizer = optim.Adam(
             model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY
         )
@@ -174,9 +176,9 @@ def main():
                             optimizer)
         logger.info(f"Load model {feature_extraction_model}")
         logger.info(f'Original classifier {model.fcs}')
-        model.classifier_to_detection(num_cells=7,
-                    num_boxes=2,
-                    num_classes=20)
+        model.classifier_to_detection(num_cells=CELLS_PER_DIM,
+                    num_boxes=BOXES_NUM,
+                    num_classes=CLASSES_NUM)
         model.fcs.train()
         logger.info(f'Target classifier {model.fcs}')
 
@@ -185,9 +187,10 @@ def main():
         optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
         model.to(DEVICE)
     else:
-        model = Model(num_cells=7,
-                    num_boxes=2,
-                    num_classes=20).to(DEVICE)
+        model = Model(num_cells=CELLS_PER_DIM,
+                    num_boxes=BOXES_NUM,
+                    num_classes=CLASSES_NUM,
+                    image_size=IMAGE_HEIGHT).to(DEVICE)
         optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
         if model_path:
             load_checkpoint(torch.load(model_path,map_location=torch.device(DEVICE)),

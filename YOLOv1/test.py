@@ -113,7 +113,7 @@ transform = Compose([transforms.Resize((IMAGE_HEIGHT, IMAGE_WIDTH)), transforms.
 
 def main():
 
-    model = Model(num_cells=7, num_boxes=2, num_classes=20).to(DEVICE)
+    model = Model(num_cells=7, num_boxes=2, num_classes=20, image_size=IMAGE_HEIGHT).to(DEVICE)
     optimizer = optim.Adam(
         model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY
     )
