@@ -37,8 +37,8 @@ import argparse
 import pathlib
 import logging, logging.config
 
-import pdb
-
+#import pdb
+torch.cuda.empty_cache()
 
 parser = argparse.ArgumentParser(prog='pretrain',
             description='model trainer')
@@ -296,7 +296,7 @@ def run_show():
             fig, ax = plt.subplots(1)
             # Display the image
             ax.imshow(im)
-            plt.title(','.join(name_list)+'('+','.join(exp_list)+')')
+            plt.title(','.join(name_list)+'(expect: '+','.join(exp_list)+')')
             plt.show()
 
 def report_per_class_accuracy(class_correct, class_samples):

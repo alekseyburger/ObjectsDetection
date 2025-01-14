@@ -58,6 +58,7 @@ class Model(nn.Module):
         super(Model, self).__init__()
 
         self.in_channels = in_channels
+        self.image_size =image_size
         # it returns output chennals number in self.in_channels
         self.cnn = self._create_conv_layers(cnn_architecture_config, self.in_channels, image_size)
         self.reduction = None
@@ -174,34 +175,15 @@ class Model(nn.Module):
         Creating classification layers for the pre-trained model runing as a classifier
         The output is an array of probabilities for each class.
         '''
-
-        lsize = 4096   # Fit model to available GPU resources
+        lsize = 4096 # Fit model to available GPU resources
+        if self.image_size == 448:
+            lsize = 3072-512
+        elif self.image_size == 112:
+            lsize = num_classes * 512
         return nn.Sequential(
             nn.Flatten(),
             nn.Linear(in_features = in_channals, out_features=lsize, bias=True),
-            nn.Dropout(0.01),
-            nn.LeakyReLU(0.1),
-            nn.Linear(lsize, num_classes, bias=False),
-            nn.Sigmoid()
-        )
-
-    def _create_pretraining_fcs_3linear(self, in_channals, num_cells, num_boxes, num_classes):
-        '''
-        Creating classification layers for the pre-trained model runing as a classifier
-        The output is an array of probabilities for each class.
-        '''
-
-        # Fit model to available GPU resources
-        lsize = 4096
-
-        return nn.Sequential(
-            nn.Flatten(),
-            # nn.Linear(in_features = in_channals * 4 * num_cells * num_cells, out_features=lsize, bias=True),
-            nn.Linear(in_features = in_channals *3 *3,  out_features=lsize, bias=True),
-            nn.Dropout(0.1),
-            nn.LeakyReLU(0.01),
-            nn.Linear(in_features = lsize,  out_features=lsize, bias=True),
-            nn.Dropout(0.1),
+            nn.Dropout(0.0),
             nn.LeakyReLU(0.01),
             nn.Linear(lsize, num_classes, bias=False),
             nn.Sigmoid()
