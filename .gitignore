@@ -1,10 +1,9 @@
 debug.py
-*.csv
-data/
-images/
-labels/
-logs/
-model/
+data
+images
+labels
+logs
+model
 __pycache__
 .ipynb_checkpoints/
 *.tar

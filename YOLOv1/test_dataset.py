@@ -26,9 +26,9 @@ NUM_WORKERS = 1
 PIN_MEMORY = True
 # LOAD_MODEL = False
 # LOAD_MODEL_FILE = "overfit.pth.tar"
-IMG_DIR = "data/images"
-LABEL_DIR = "data/labels"
-FILE_CSV = "data/1examples.csv"
+IMG_DIR = "test"
+LABEL_DIR = "test"
+FILE_CSV = "test/1examples.csv"
 
 
 class Compose(object):
