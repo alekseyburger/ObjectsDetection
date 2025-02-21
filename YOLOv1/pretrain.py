@@ -176,7 +176,7 @@ def train():
     
     loss_fn = nn.CrossEntropyLoss()
     if model_path:
-        load_checkpoint(torch.load(model_path, map_location=torch.device(DEVICE)), model, optimizer)
+        load_checkpoint(torch.load(model_path, map_location=torch.device(DEVICE),weights_only=True), model, optimizer)
         optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
         model.train()
         logger.info(f"Load model {model_path}")
@@ -263,8 +263,8 @@ def run_show():
                    image_size=IMAGE_HEIGHT).to(DEVICE)
     optimizer = optim.Adam(
         model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
- 
-    load_checkpoint(torch.load(model_path, map_location=torch.device(DEVICE)), model, optimizer)
+    
+    load_checkpoint(torch.load(model_path, map_location=torch.device(DEVICE),weights_only=True), model, optimizer)
     logger.info(f"Load model {model_path}")
 
     test_dataset = ClassificationDataset(
@@ -291,7 +291,7 @@ def run_show():
         for idx in range(images.shape[0]):
             name_list = [cls[i] for i in range(CLASSES_NUM)  if class_predictions[idx][i] > .9]
             exp_list = [cls[i] for i in range(CLASSES_NUM)  if exp_label[idx][i] > .9]
-            im = np.array(images[idx].permute(1,2,0).to("cpu"))
+            im = np.asarray(images[idx].permute(1,2,0).to("cpu"))
             # Create figure and axes
             fig, ax = plt.subplots(1)
             # Display the image
@@ -302,7 +302,7 @@ def run_show():
 def report_per_class_accuracy(class_correct, class_samples):
     for c in range(CLASSES_NUM):
         logger.info( f'{cls[c]} ({c}): \t{class_correct[c]} / {class_samples[c]} = {class_correct[c]*100/(class_samples[c] + 1.e-11):3.0f}%' )
-    logger.info( f'Commulative {sum(class_correct)} / {sum(class_samples)} = {sum(class_correct)*100/(sum(class_samples) + 1.e-11):3.0f}%' )
+    logger.info( f'Cumulative {sum(class_correct)} / {sum(class_samples)} = {sum(class_correct)*100/(sum(class_samples) + 1.e-11):3.0f}%' )
    
 def run_accuracy():
 
@@ -316,7 +316,7 @@ def run_accuracy():
     optimizer = optim.Adam(
         model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
 
-    load_checkpoint(torch.load(model_path, map_location=torch.device(DEVICE)), model, optimizer)
+    load_checkpoint(torch.load(model_path, map_location=torch.device(DEVICE),weights_only=True), model, optimizer)
     logger.info(f"Load model {model_path}")
 
     test_dataset = ClassificationDataset(
